@@ -19,6 +19,7 @@ extends CanvasLayer
 ## name, property, min, max, step
 const PARAMS := [
 	["hit threshold m/s²", "hit_threshold", 0.5, 10.0, 0.25],
+	["timing bias s", "timing_bias", -0.2, 0.2, 0.01],
 	["perfect window s", "perfect_dt", 0.02, 0.2, 0.01],
 	["good window s", "good_dt", 0.05, 0.4, 0.01],
 	["grace after land s", "grace_after", 0.0, 0.3, 0.01],
@@ -118,7 +119,7 @@ func _on_stopped(streak: int, score: int, st: Dictionary) -> void:
 		"  min %+.0f ms   max %+.0f ms" % [st["dt_min"] * 1000.0, st["dt_max"] * 1000.0],
 		"swing peak avg %.1f m/s²" % st["peak_avg"],
 		"",
-		"windows: perfect <= %.0f ms, good <= %.0f ms" % [_game.perfect_dt * 1000.0, _game.good_dt * 1000.0],
+		"windows: bias %+.0f ms, perfect <= %.0f ms, good <= %.0f ms" % [_game.timing_bias * 1000.0, _game.perfect_dt * 1000.0, _game.good_dt * 1000.0],
 	])
 	_results.visible = true
 
