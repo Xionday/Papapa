@@ -60,7 +60,8 @@ var _t_land: float = 0.0                    ## 這次落地時刻
 var _t_apex: float = 0.0                    ## 這次彈起的理論最高點時刻（收縮環從這裡開始）
 var _t_land_pred: float = 0.0               ## 理論落地時刻
 var _ash: Array = []                        ## PERFECT 的灰燼粒子 {p, v, life, r}
-var _ring_gold: float = 0.0                 ## PERFECT 後環變金色的殘留時間
+var _ring_gold: float = 0.0                 ## PERFECT 後金環剩餘時間
+var _ring_gold_total: float = 0.5           ## 金環總時長 = 這次彈起到最高點的時間
 var _ring_gold_pos: Vector2 = Vector2.ZERO
 var last_grade: String = ""
 var last_dt: float = 0.0
@@ -299,7 +300,9 @@ func _judge() -> void:
 ## PERFECT：環變金色，碎成灰燼飄散
 func _spawn_ash() -> void:
 	## 金環與灰燼用螢幕座標，固定在畫面上，不跟著手機位移
-	_ring_gold = 0.5
+	## 金環時長 = 到最高點的時間，半徑跟著影子一起放大
+	_ring_gold_total = max(0.2, last_launch / gravity_m)
+	_ring_gold = _ring_gold_total
 	_ring_gold_pos = _to_screen(ball_pos)
 	_ash.clear()
 	var n := 36
@@ -393,8 +396,9 @@ func _draw() -> void:
 	## PERFECT 的金環殘影與灰燼
 	if _ring_gold > 0.0:
 		var gp := _ring_gold_pos
-		var f: float = _ring_gold / 0.5
-		draw_arc(gp, BALL_R_LAND + (1.0 - f) * 30.0, 0.0, TAU, 64, Color(1.0, 0.84, 0.3, 0.8 * f), 3.0)
+		var f: float = _ring_gold / _ring_gold_total
+		## 半徑 = 此刻影子的半徑（球越高影子越大），位置固定在畫面上
+		draw_arc(gp, shadow_r, 0.0, TAU, 64, Color(1.0, 0.84, 0.3, 0.8 * f), 3.0)
 	for d in _ash:
 		var f2: float = d["life"] / d["max"]
 		draw_circle(d["p"], d["r"] * f2, Color(1.0, 0.8, 0.3, 0.9 * f2))
