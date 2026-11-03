@@ -20,8 +20,10 @@ signal pushed(step: Vector2)
 @export var good_dt: float = 0.12           ## s，在這之內 = GOOD；再外面 = BAD
 ## 手機位移（衝量版）：水平加速度積分成速度、再強力阻尼，位移 = 速度 × px_per_m
 @export var move_enabled: bool = true
-@export var move_deadzone: float = 0.6      ## m/s²，低於這個的水平加速度視為噪音
-@export var move_damping: float = 5.0       ## 1/s，速度衰減；越大「推一下」越短促
+@export var move_deadzone: float = 0.8      ## m/s²，低於這個的水平加速度視為手持雜訊（靜止時不起步）
+@export var move_damping: float = 0.0       ## 1/s，速度衰減（0 = 純積分，靠 ZUPT 歸零）
+@export var move_lowpass: float = 0.05      ## s，加速度低通時間常數
+@export var move_zupt: float = 0.15         ## s，連續安靜這麼久就把速度歸零（zero-velocity update）
 @export var px_per_m: float = 2500.0        ## 手機移 10 cm ≈ 畫面移 250 px
 @export var center_strength: float = 0.0    ## 每次拍起，球在飛行中回到螢幕中心的比例（0 = 不回中）
 @export var edge_margin: float = 40.0       ## px，球離螢幕邊緣最少保留
@@ -56,6 +58,10 @@ var v_lat: Vector2 = Vector2.ZERO           ## px/s
 var last_launch: float = 0.0
 var paddle_pos: Vector2 = Vector2.ZERO      ## 球拍（螢幕中心）在世界裡的位置
 var phone_vel: Vector2 = Vector2.ZERO       ## 估計的手機水平速度 m/s（螢幕座標）
+var _accel_lp: Vector2 = Vector2.ZERO       ## 低通後的水平加速度
+var _quiet_t: float = 0.0                   ## 連續安靜時間
+var last_move_px: float = 0.0               ## 最近一次連續移動走了幾 px（HUD 用）
+var _move_acc: float = 0.0
 var streak: int = 0
 var score: int = 0
 var best_streak: int = 0
@@ -301,20 +307,34 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
-## 手機位移：不是真的追蹤位置，是把「推一下」的衝量變成短暫的速度
+## 手機位移（衝量版 + 低通 + 遲滯 + ZUPT）
+## 不是真的追蹤位置：加速度積分成速度，靠「安靜一段時間就把速度歸零」避免飄移。
+## 一旦動起來，低於死區的加速度照樣積分，所以平穩的移動也會完整反映；
+## 代價是超過 1 秒的極慢移動（峰值加速度 < 死區）不會起步。
 func _step_move(delta: float) -> void:
 	if not move_enabled:
 		return
-	var a := horiz_accel
+	_accel_lp += (horiz_accel - _accel_lp) * (1.0 - exp(-delta / max(0.001, move_lowpass)))
+	var a := _accel_lp
+	var moving := phone_vel != Vector2.ZERO
 	if a.length() < move_deadzone:
-		a = Vector2.ZERO
+		_quiet_t += delta
+		if not moving:
+			a = Vector2.ZERO
+	else:
+		_quiet_t = 0.0
 	phone_vel += a * delta
-	phone_vel *= exp(-move_damping * delta)
-	if phone_vel.length() < 0.005:
+	if move_damping > 0.0:
+		phone_vel *= exp(-move_damping * delta)
+	if _quiet_t > move_zupt:
 		phone_vel = Vector2.ZERO
+		if _move_acc > 0.0:
+			last_move_px = _move_acc
+			_move_acc = 0.0
 	var step := phone_vel * px_per_m * delta
 	if step != Vector2.ZERO:
 		paddle_pos += step
+		_move_acc += step.length()
 		pushed.emit(step)
 
 

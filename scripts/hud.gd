@@ -34,8 +34,9 @@ const PARAMS := [
 	["good window s", "good_dt", 0.05, 0.4, 0.01],
 	["grace after land s", "grace_after", 0.0, 0.3, 0.01],
 	["move px per m", "px_per_m", 0.0, 4000.0, 100.0],
-	["move damping", "move_damping", 1.0, 12.0, 0.5],
-	["move deadzone m/s²", "move_deadzone", 0.0, 2.0, 0.1],
+	["move damping", "move_damping", 0.0, 6.0, 0.25],
+	["move deadzone m/s²", "move_deadzone", 0.2, 2.0, 0.1],
+	["move zupt s", "move_zupt", 0.05, 0.5, 0.01],
 	["center strength", "center_strength", 0.0, 1.0, 0.05],
 	["bad launch x", "bad_launch", 0.3, 0.95, 0.05],
 	["full launch m/s", "full_launch", 3.0, 9.0, 0.1],
@@ -179,6 +180,6 @@ func _process(delta: float) -> void:
 	_debug.text = "\n".join([
 		"sensor %s  %d Hz  fps %d  haptic %s" % [_sensor.status, _sensor.hz, Engine.get_frames_per_second(), _sensor.haptic_mode],
 		"up accel %+5.1f   horiz %4.1f   h %.2f m   zone %d left %d" % [_game.up_accel, _game.horiz_accel.length(), _game.ball_h, _game.zone_index, _game.zone_left],
-		"tilt %+4.1f %+4.1f   phone vel %+.2f %+.2f" % [_game.tilt.x, _game.tilt.y, _game.phone_vel.x, _game.phone_vel.y],
+		"tilt %+4.1f %+4.1f   vel %+.2f %+.2f   last move %.0f px" % [_game.tilt.x, _game.tilt.y, _game.phone_vel.x, _game.phone_vel.y, _game.last_move_px],
 		_last_event,
 	])
