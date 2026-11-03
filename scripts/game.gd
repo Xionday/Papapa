@@ -66,6 +66,7 @@ var last_launch: float = 0.0
 var paddle_pos: Vector2 = Vector2.ZERO      ## 球拍（螢幕中心）在世界裡的位置
 var phone_vel: Vector2 = Vector2.ZERO       ## 估計的手機水平速度 m/s（螢幕座標）
 var _accel_lp: Vector2 = Vector2.ZERO       ## 低通後的水平加速度
+var _accel_buf: Array[Vector2] = []         ## 最近 0.2 秒被死區忽略的加速度（起步時補積分）
 var _quiet_t: float = 0.0                   ## 連續安靜時間
 var last_move_px: float = 0.0               ## 最近一次連續移動走了幾 px（HUD 用）
 var _move_acc: float = 0.0
@@ -334,9 +335,18 @@ func _step_move(delta: float) -> void:
 	if a.length() < move_deadzone:
 		_quiet_t += delta
 		if not moving:
+			## 靜止中：不積分，但記下來，等真的動起來時補回去
+			_accel_buf.append(a * delta)
+			if _accel_buf.size() > 12:   ## 約 0.2 秒
+				_accel_buf.pop_front()
 			a = Vector2.ZERO
 	else:
 		_quiet_t = 0.0
+		if not moving:
+			## 起步：把剛才被死區吃掉的那段一次補進速度
+			for d in _accel_buf:
+				phone_vel += d
+			_accel_buf.clear()
 	phone_vel += a * delta
 	if move_damping > 0.0:
 		phone_vel *= exp(-move_damping * delta)
