@@ -8,7 +8,9 @@ extends Node
 signal sample(linear: Vector3, gravity: Vector3)
 
 var _js: JavaScriptObject = null
+var _haptic: JavaScriptObject = null
 var _last_seq: int = -1
+var haptic_mode: String = "native"
 
 ## 給 HUD 看的除錯資訊
 var status: String = "native"
@@ -27,6 +29,17 @@ func _ready() -> void:
 			status = "no motion.js"
 		else:
 			user_agent = str(_js.ua)
+		_haptic = JavaScriptBridge.get_interface("papapaHaptic")
+		haptic_mode = str(_haptic.mode) if _haptic != null else "none"
+
+
+## 震動：count 連點幾下。強擊 1、弱擊 2、漏接 3。
+func haptic(count: int = 1, gap_ms: int = 70) -> void:
+	if _haptic != null:
+		haptic_mode = str(_haptic.mode)
+		_haptic.tap(count, gap_ms)
+	elif not OS.has_feature("web"):
+		Input.vibrate_handheld(40 * count)
 
 
 func _process(_delta: float) -> void:

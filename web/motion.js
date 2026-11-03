@@ -66,9 +66,48 @@
     document.body.appendChild(btn);
   }
 
+  // ---- 震動 ----
+  // Safari 不支援 navigator.vibrate。已知的替代法：iOS 的 <input type="checkbox" switch>
+  // 被切換時會觸發系統觸覺回饋，用 JS 點它的 <label> 也會。這是 hack，Apple 隨時可能擋掉。
+  // 需要手機「設定 → 聲音與觸覺回饋 → 系統觸覺回饋」是開的。
+  var H = { supported: false, mode: "none" };
+  window.papapaHaptic = H;
+  var swInput, swLabel;
+
+  function setupHaptic() {
+    if (navigator.vibrate) { H.supported = true; H.mode = "vibrate"; return; }
+    swInput = document.createElement("input");
+    swInput.type = "checkbox";
+    swInput.setAttribute("switch", "");
+    swInput.id = "papapa-haptic-switch";
+    swLabel = document.createElement("label");
+    swLabel.htmlFor = swInput.id;
+    var hide = "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none";
+    swInput.style.cssText = hide;
+    swLabel.style.cssText = hide;
+    document.body.appendChild(swInput);
+    document.body.appendChild(swLabel);
+    H.supported = true;
+    H.mode = "switch";
+  }
+
+  // count: 連點幾下；gap: 間隔 ms
+  H.tap = function (count, gap) {
+    count = count || 1; gap = gap || 70;
+    if (H.mode === "vibrate") { var p = []; for (var i = 0; i < count; i++) { p.push(30); p.push(gap); } navigator.vibrate(p); return; }
+    if (H.mode !== "switch") return;
+    var n = 0;
+    (function step() {
+      swLabel.click();
+      n++;
+      if (n < count) setTimeout(step, gap);
+    })();
+  };
+
+  function init() { makeButton(); setupHaptic(); }
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", makeButton);
+    document.addEventListener("DOMContentLoaded", init);
   } else {
-    makeButton();
+    init();
   }
 })();

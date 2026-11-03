@@ -17,7 +17,7 @@ const PARAMS := [
 	["hit window s", "hit_window", 0.05, 0.4, 0.01],
 	["push threshold m/s²", "push_threshold", 1.0, 10.0, 0.5],
 	["push distance px", "push_distance", 100.0, 600.0, 10.0],
-	["decay (no swing)", "decay", 0.5, 0.95, 0.05],
+	["decay (1st weak)", "decay", 0.3, 0.95, 0.05],
 	["full launch m/s", "full_launch", 3.0, 9.0, 0.1],
 	["lateral gain", "lateral_gain", 0.0, 400.0, 10.0],
 	["show height m", "show_height", 0.2, 1.5, 0.05],
@@ -36,6 +36,9 @@ func _ready() -> void:
 		_show_msg("tilt zeroed"))
 	_game.hit.connect(_on_hit)
 	_game.missed.connect(_on_missed)
+	_game.stopped.connect(func(streak: int):
+		_last_event = "STOPPED after %d (two weak hits)" % streak
+		_show_msg("ball stopped - swing up!"))
 	_game.pushed.connect(_on_pushed)
 	_build_sliders()
 
@@ -99,7 +102,7 @@ func _process(delta: float) -> void:
 		_msg.text = ""
 	_score.text = "%d   best %d" % [_game.streak, _game.best]
 	_debug.text = "\n".join([
-		"sensor %s  %d Hz  fps %d" % [_sensor.status, _sensor.hz, Engine.get_frames_per_second()],
+		"sensor %s  %d Hz  fps %d  haptic %s" % [_sensor.status, _sensor.hz, Engine.get_frames_per_second(), _sensor.haptic_mode],
 		"up accel %+5.1f   horiz %4.1f" % [_game.up_accel, _game.horiz_accel.length()],
 		"tilt x %+4.1f y %+4.1f   height %.2f m" % [_game.tilt.x, _game.tilt.y, _game.ball_h],
 		_last_event,

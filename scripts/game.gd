@@ -5,6 +5,7 @@ extends Node2D
 
 signal hit(strong: bool, streak: int)
 signal missed(streak: int)
+signal stopped(streak: int)   ## 連續兩次沒用力，球停在拍面上
 signal pushed(dir: Vector2)
 
 ## ---- 可調參數（HUD 的滑桿會改這些）----
@@ -13,9 +14,9 @@ signal pushed(dir: Vector2)
 @export var push_threshold: float = 3.0     ## m/s²，水平加速度超過就算「推一下」
 @export var push_distance: float = 300.0    ## px，推一下球拍在世界裡移動多遠
 @export var push_cooldown: float = 0.35     ## s
-@export var decay: float = 0.8              ## 沒用力時，下一次起跳速度 = 上次 × decay
+@export var decay: float = 0.6              ## 第一次沒用力：下一次起跳速度 = 上次 × decay
+@export var max_weak: int = 2               ## 連續幾次沒用力，球就停在拍面上
 @export var full_launch: float = 5.9        ## m/s，用力時的起跳速度（約 1.2 秒滯空）
-@export var min_launch: float = 2.0         ## m/s，衰減的下限
 @export var lateral_gain: float = 150.0     ## px/s per m/s² 的傾斜
 @export var show_height: float = 0.6        ## m，球低於這個高度才看得到
 @export var gravity_m: float = 9.8
@@ -30,6 +31,8 @@ var paddle_pos: Vector2 = Vector2.ZERO      ## 球拍（螢幕中心）在世界
 var _paddle_target: Vector2 = Vector2.ZERO
 var streak: int = 0
 var best: int = 0
+var weak_count: int = 0                     ## 連續弱擊次數，強擊歸零
+var ball_stopped: bool = false              ## 球停在拍面上（dead 期間仍畫出球）
 var state: String = "serve"                 ## serve | air | dead
 var _dead_timer: float = 0.0
 var _push_timer: float = 0.0
@@ -88,6 +91,8 @@ func _serve() -> void:
 	v_up = full_launch
 	v_lat = Vector2.ZERO
 	streak = 0
+	weak_count = 0
+	ball_stopped = false
 
 
 func _process(delta: float) -> void:
@@ -124,21 +129,37 @@ func _step_air(delta: float) -> void:
 			last_hit_peak = peak
 			var strong := peak >= hit_threshold
 			if strong:
+				weak_count = 0
 				last_launch = full_launch
 			else:
-				last_launch = max(last_launch * decay, min_launch)
+				weak_count += 1
+				if weak_count >= max_weak:
+					## 球停在拍面上：這回合結束
+					state = "dead"
+					_dead_timer = 1.5
+					v_up = 0.0
+					v_lat = Vector2.ZERO
+					ball_stopped = true
+					_flash = 1.0
+					_flash_color = Color(0.98, 0.6, 0.3)
+					_sensor.haptic(3)
+					stopped.emit(streak)
+					return
+				last_launch = last_launch * decay
 			v_up = last_launch
 			v_lat = tilt * lateral_gain
 			streak += 1
 			best = max(best, streak)
 			_flash = 1.0
 			_flash_color = Color(0.36, 0.79, 0.65) if strong else Color(0.98, 0.78, 0.46)
+			_sensor.haptic(1 if strong else 2)
 			hit.emit(strong, streak)
 		else:
 			state = "dead"
 			_dead_timer = 1.5
 			_flash = 1.0
 			_flash_color = Color(0.89, 0.29, 0.29)
+			_sensor.haptic(3)
 			missed.emit(streak)
 
 
@@ -182,7 +203,7 @@ func _draw() -> void:
 	draw_circle(sp, shadow_r, Color(0, 0, 0, shadow_a))
 
 	## 球：只有低於 show_height 才看得到，越高(越靠近眼睛)越大
-	if ball_h <= show_height and state != "dead":
+	if ball_h <= show_height and (state != "dead" or ball_stopped):
 		var k: float = clamp(ball_h / show_height, 0.0, 1.0)
 		var r: float = lerp(26.0, 70.0, k)
 		draw_circle(sp, r, Color(0.94, 0.6, 0.48))
