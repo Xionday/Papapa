@@ -9,6 +9,7 @@ extends Node2D
 
 signal judged(grade: String, dt: float, streak: int, score: int)
 signal stopped(streak: int, score: int, stats: Dictionary)
+signal zone_changed(index: int)
 signal pushed(step: Vector2)
 
 ## ---- 可調參數（HUD 的滑桿會改這些）----
@@ -31,6 +32,19 @@ signal pushed(step: Vector2)
 @export var lateral_gain: float = 150.0     ## px/s per m/s² 的傾斜
 @export var show_height: float = 0.6        ## m，球低於這個高度才看得到
 @export var gravity_m: float = 9.8
+
+## ---- 光圈模式 ----
+@export var zone_mode: bool = true
+## 依連擊數分階段；每階段：連擊門檻、每幾次彈跳換位置、半徑 px、出現距離最小/最大 px
+const ZONE_STAGES := [
+	[0, 2, 180.0, 150.0, 300.0],
+	[10, 2, 140.0, 200.0, 400.0],
+	[20, 1, 140.0, 200.0, 400.0],
+	[30, 1, 110.0, 250.0, 500.0],
+	[50, 1, 80.0, 300.0, 600.0],
+]
+@export var zone_scale: float = 1.0         ## 全部半徑的倍率（tune 用）
+@export var zone_dist_scale: float = 1.0    ## 全部距離的倍率（tune 用）
 
 const SCORE := {"perfect": 3, "good": 2, "bad": 1, "miss": 0}
 
@@ -60,6 +74,16 @@ var _t_land: float = 0.0                    ## 這次落地時刻
 var _t_apex: float = 0.0                    ## 這次彈起的理論最高點時刻（收縮環從這裡開始）
 var _t_land_pred: float = 0.0               ## 理論落地時刻
 var _ash: Array = []                        ## PERFECT 的灰燼粒子 {p, v, life, r}
+var zone_pos: Vector2 = Vector2.ZERO        ## 光圈世界座標
+var zone_r: float = 180.0
+var zone_left: int = 2                      ## 還有幾次彈跳會換位置
+var zone_index: int = 0
+var _zone_old_pos: Vector2 = Vector2.ZERO
+var _zone_old_r: float = 0.0
+var _zone_fade: float = 0.0                 ## 舊圈淡出剩餘時間
+var _zone_grow: float = 0.0                 ## 新圈放大剩餘時間
+var _zone_hit_flash: float = 0.0
+var fell_outside: bool = false              ## 這局是因為落在圈外結束
 var _ring_gold: float = 0.0                 ## PERFECT 後金環剩餘時間
 var _ring_gold_total: float = 0.5           ## 金環總時長 = 這次彈起到最高點的時間
 var _ring_gold_pos: Vector2 = Vector2.ZERO
@@ -133,9 +157,11 @@ func _serve() -> void:
 	ball_stopped = false
 	last_grade = ""
 	round_log = []
+	fell_outside = false
 	_t_visible = -1.0
 	_apex_ticked = false
 	_launch_timing()
+	_zone_reset()
 
 
 func play_again() -> void:
@@ -172,6 +198,48 @@ func round_stats() -> Dictionary:
 	return st
 
 
+## ---- 光圈 ----
+func _zone_stage() -> Array:
+	var st: Array = ZONE_STAGES[0]
+	for row in ZONE_STAGES:
+		if streak >= row[0]:
+			st = row
+	return st
+
+
+func _zone_reset() -> void:
+	## 第一個圈放在拍面中心，讓開局不用追
+	var st := _zone_stage()
+	zone_index = 0
+	zone_pos = paddle_pos
+	zone_r = st[2] * zone_scale
+	zone_left = st[1]
+	_zone_fade = 0.0
+	_zone_grow = 0.25
+	_zone_hit_flash = 0.0
+
+
+func _zone_relocate() -> void:
+	var st := _zone_stage()
+	_zone_old_pos = zone_pos
+	_zone_old_r = zone_r
+	_zone_fade = 0.3
+	_zone_grow = 0.3
+	var dist: float = randf_range(st[3], st[4]) * zone_dist_scale
+	var ang: float = randf_range(0.0, TAU)
+	## 以球目前位置為基準，確保追得到
+	zone_pos = ball_pos + Vector2(cos(ang), sin(ang)) * dist
+	zone_r = st[2] * zone_scale
+	zone_left = st[1]
+	zone_index += 1
+	_sfx.play("zone")
+	zone_changed.emit(zone_index)
+
+
+func _in_zone() -> bool:
+	return ball_pos.distance_to(zone_pos) <= zone_r
+
+
 ## 起跳瞬間算出理論最高點與落地時刻（收縮環用）
 func _launch_timing() -> void:
 	var t_half: float = v_up / gravity_m
@@ -182,6 +250,9 @@ func _launch_timing() -> void:
 func _process(delta: float) -> void:
 	_flash = max(0.0, _flash - delta * 3.0)
 	_ring_gold = max(0.0, _ring_gold - delta)
+	_zone_fade = max(0.0, _zone_fade - delta)
+	_zone_grow = max(0.0, _zone_grow - delta)
+	_zone_hit_flash = max(0.0, _zone_hit_flash - delta)
 	_step_move(delta)
 	_step_ash(delta)
 
@@ -239,6 +310,14 @@ func _step_air(delta: float) -> void:
 
 
 func _judge() -> void:
+	## 光圈模式：沒落在圈內就直接結束
+	if zone_mode and not _in_zone():
+		fell_outside = true
+		last_grade = "outside"
+		round_log.append({"grade": "miss", "dt": 0.0, "peak": 0.0})
+		_end_round(Color(0.89, 0.29, 0.29))
+		return
+
 	var peak := _peak_between(_t_visible, _t_land + grace_after)
 	last_peak = peak.y
 	var grade: String
@@ -281,18 +360,14 @@ func _judge() -> void:
 	_flash = 1.0
 
 	if bad_count >= max_bad:
-		state = "dead"
-		_dead_timer = 1.5
-		v_up = 0.0
-		v_lat = Vector2.ZERO
-		ball_stopped = true
-		_flash_color = Color(0.89, 0.29, 0.29)
-		_sensor.haptic(3)
-		_sfx.play("stop")
-		best_streak = max(best_streak, streak)
-		best_score = max(best_score, score)
-		stopped.emit(streak, score, round_stats())
+		_end_round(Color(0.89, 0.29, 0.29))
 		return
+
+	if zone_mode:
+		_zone_hit_flash = 0.3
+		zone_left -= 1
+		if zone_left <= 0:
+			_zone_relocate()
 
 	streak += 1
 	score += SCORE[grade]
@@ -308,6 +383,20 @@ func _judge() -> void:
 	_launch_timing()
 	state = "air"
 	judged.emit(grade, last_dt, streak, score)
+
+
+func _end_round(col: Color) -> void:
+	state = "dead"
+	v_up = 0.0
+	v_lat = Vector2.ZERO
+	ball_stopped = true
+	_flash = 1.0
+	_flash_color = col
+	_sensor.haptic(3)
+	_sfx.play("stop")
+	best_streak = max(best_streak, streak)
+	best_score = max(best_score, score)
+	stopped.emit(streak, score, round_stats())
 
 
 ## PERFECT：環變金色，碎成灰燼飄散
@@ -383,6 +472,9 @@ func _draw() -> void:
 		draw_line(Vector2(0, y), Vector2(vp.x, y), gc, 1.0)
 		y += grid
 
+	if zone_mode:
+		_draw_zone(vp)
+
 	var sp := _to_screen(ball_pos)
 	var max_h: float = max(0.01, (last_launch * last_launch) / (2.0 * gravity_m))
 	var t: float = clamp(ball_h / max_h, 0.0, 1.0)
@@ -420,3 +512,44 @@ func _draw() -> void:
 	if visible_ball:
 		draw_circle(sp, ball_r, Color(0.94, 0.6, 0.48))
 		draw_circle(sp + Vector2(-ball_r * 0.3, -ball_r * 0.3), ball_r * 0.25, Color(1, 1, 1, 0.5))
+
+
+## ---- 光圈繪製 ----
+const ZONE_COL := Color(0.55, 0.85, 1.0)
+
+
+func _draw_zone(vp: Vector2) -> void:
+	## 舊圈淡出
+	if _zone_fade > 0.0:
+		var f: float = _zone_fade / 0.3
+		draw_arc(_to_screen(_zone_old_pos), _zone_old_r * (1.0 + (1.0 - f) * 0.3), 0.0, TAU, 64, Color(ZONE_COL, 0.4 * f), 3.0)
+	## 現在的圈：剛出現時從小放大
+	var zp := _to_screen(zone_pos)
+	var g: float = 1.0 - _zone_grow / 0.3
+	g = 1.0 - (1.0 - g) * (1.0 - g)   ## ease-out
+	var r: float = zone_r * clamp(g, 0.05, 1.0)
+	var hit: float = _zone_hit_flash / 0.3
+	draw_circle(zp, r, Color(ZONE_COL, 0.08 + 0.25 * hit))
+	draw_arc(zp, r, 0.0, TAU, 64, Color(ZONE_COL, 0.7 + 0.3 * hit), 4.0 + 4.0 * hit)
+	## 剩幾次換位置：圈內畫小點
+	for i in zone_left:
+		draw_circle(zp + Vector2(-14.0 * (zone_left - 1) + 28.0 * i, r + 22.0), 5.0, Color(ZONE_COL, 0.9))
+
+	## 圈在畫面外：邊緣箭頭 + 距離
+	var margin := 40.0
+	if zp.x < -zone_r or zp.x > vp.x + zone_r or zp.y < -zone_r or zp.y > vp.y + zone_r:
+		var c := vp * 0.5
+		var dir := (zp - c).normalized()
+		## 和螢幕矩形（縮 margin）的交點
+		var half := c - Vector2(margin, margin)
+		var tx: float = half.x / max(abs(dir.x), 0.0001)
+		var ty: float = half.y / max(abs(dir.y), 0.0001)
+		var ep: Vector2 = c + dir * min(tx, ty)
+		var perp := Vector2(-dir.y, dir.x)
+		var tri := PackedVector2Array([ep + dir * 22.0, ep - dir * 10.0 + perp * 16.0, ep - dir * 10.0 - perp * 16.0])
+		draw_colored_polygon(tri, ZONE_COL)
+		var dist_px: float = (zone_pos - ball_pos).length()
+		var font := ThemeDB.fallback_font
+		var txt := "%d" % int(dist_px)
+		var tp: Vector2 = ep - dir * 48.0
+		draw_string(font, tp + Vector2(-20.0, 10.0), txt, HORIZONTAL_ALIGNMENT_CENTER, 40.0, 26, ZONE_COL)

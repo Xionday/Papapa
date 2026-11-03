@@ -106,7 +106,7 @@ anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 16.0
-offset_top = -840.0
+offset_top = -920.0
 offset_right = -16.0
 offset_bottom = -110.0
 grow_horizontal = 2
@@ -139,6 +139,13 @@ custom_minimum_size = Vector2(0, 56)
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 22
 text = "show real switch"
+
+[node name="ZoneToggle" type="Button" parent="HUD/Panel/VBox/Tests"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 56)
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "zone: on"
 
 [node name="TestSound" type="Button" parent="HUD/Panel/VBox/Tests"]
 layout_mode = 2

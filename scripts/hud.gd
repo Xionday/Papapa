@@ -18,9 +18,12 @@ extends CanvasLayer
 @onready var _test_haptic: Button = $Panel/VBox/Tests/TestHaptic
 @onready var _show_switch: Button = $Panel/VBox/Tests/ShowSwitch
 @onready var _test_sound: Button = $Panel/VBox/Tests/TestSound
+@onready var _zone_btn: Button = $Panel/VBox/Tests/ZoneToggle
 
 ## name, property, min, max, step
 const PARAMS := [
+	["zone size x", "zone_scale", 0.5, 2.0, 0.1],
+	["zone distance x", "zone_dist_scale", 0.3, 2.0, 0.1],
 	["hit threshold m/s²", "hit_threshold", 0.5, 10.0, 0.25],
 	["timing bias s", "timing_bias", -0.2, 0.2, 0.01],
 	["perfect window s", "perfect_dt", 0.02, 0.2, 0.01],
@@ -66,6 +69,10 @@ func _ready() -> void:
 	_show_switch.pressed.connect(func():
 		_sensor.show_haptic_switch()
 		_show_msg("tap the switch at bottom-left"))
+	_zone_btn.text = "zone: on" if _game.zone_mode else "zone: off"
+	_zone_btn.pressed.connect(func():
+		_game.zone_mode = not _game.zone_mode
+		_zone_btn.text = "zone: on" if _game.zone_mode else "zone: off")
 	_test_sound.pressed.connect(func():
 		_game.get_node("Sfx").play("perfect")
 		_show_msg("sound: perfect"))
@@ -117,8 +124,10 @@ func _on_stopped(streak: int, score: int, st: Dictionary) -> void:
 	_judge_timer = 1.5
 	_last_event = "STOPPED  last %s  peak %.1f" % [_game.last_grade, _game.last_peak]
 	var c: Dictionary = st["counts"]
+	var reason: String = "fell outside the zone" if _game.fell_outside else "two bad hits in a row"
 	_results_text.text = "\n".join([
-		"ROUND OVER",
+		"ROUND OVER - " + reason,
+		"zones reached %d" % (_game.zone_index + 1) if _game.zone_mode else "",
 		"",
 		"score   %d   (best %d)" % [score, _game.best_score],
 		"combo   %d   (best %d)" % [streak, _game.best_streak],
@@ -153,7 +162,7 @@ func _process(delta: float) -> void:
 	_score.text = "%d" % _game.score
 	_debug.text = "\n".join([
 		"sensor %s  %d Hz  fps %d  haptic %s" % [_sensor.status, _sensor.hz, Engine.get_frames_per_second(), _sensor.haptic_mode],
-		"up accel %+5.1f   horiz %4.1f   h %.2f m" % [_game.up_accel, _game.horiz_accel.length(), _game.ball_h],
+		"up accel %+5.1f   horiz %4.1f   h %.2f m   zone %d left %d" % [_game.up_accel, _game.horiz_accel.length(), _game.ball_h, _game.zone_index, _game.zone_left],
 		"tilt %+4.1f %+4.1f   phone vel %+.2f %+.2f" % [_game.tilt.x, _game.tilt.y, _game.phone_vel.x, _game.phone_vel.y],
 		_last_event,
 	])
