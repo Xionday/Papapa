@@ -20,7 +20,7 @@ signal pushed(step: Vector2)
 @export var good_dt: float = 0.12           ## s，在這之內 = GOOD；再外面 = BAD
 ## 手機位移（衝量版）：水平加速度積分成速度、再強力阻尼，位移 = 速度 × px_per_m
 @export var move_enabled: bool = true
-@export var move_deadzone: float = 0.8      ## m/s²，低於這個的水平加速度視為手持雜訊（靜止時不起步）
+@export var move_deadzone: float = 0.7      ## m/s²，低於這個的水平加速度視為手持雜訊（靜止時不起步）
 @export var move_damping: float = 0.0       ## 1/s，速度衰減（0 = 純積分，靠 ZUPT 歸零）
 @export var move_lowpass: float = 0.05      ## s，加速度低通時間常數
 @export var move_zupt: float = 0.15         ## s，連續安靜這麼久就把速度歸零（zero-velocity update）
