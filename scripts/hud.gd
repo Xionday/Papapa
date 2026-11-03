@@ -15,6 +15,9 @@ extends CanvasLayer
 @onready var _results: PanelContainer = $Results
 @onready var _results_text: Label = $Results/VBox/Text
 @onready var _again_btn: Button = $Results/VBox/PlayAgain
+@onready var _test_haptic: Button = $Panel/VBox/Tests/TestHaptic
+@onready var _show_switch: Button = $Panel/VBox/Tests/ShowSwitch
+@onready var _test_sound: Button = $Panel/VBox/Tests/TestSound
 
 ## name, property, min, max, step
 const PARAMS := [
@@ -57,6 +60,15 @@ func _ready() -> void:
 		_game.play_again())
 	_game.judged.connect(_on_judged)
 	_game.stopped.connect(_on_stopped)
+	_test_haptic.pressed.connect(func():
+		_sensor.haptic(3)
+		_show_msg("haptic x3 (%s)" % _sensor.haptic_mode))
+	_show_switch.pressed.connect(func():
+		_sensor.show_haptic_switch()
+		_show_msg("tap the switch at bottom-left"))
+	_test_sound.pressed.connect(func():
+		_game.get_node("Sfx").play("perfect")
+		_show_msg("sound: perfect"))
 	_build_sliders()
 
 

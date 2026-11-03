@@ -111,6 +111,12 @@
     })();
   };
 
+  // 除錯：把真正的 switch 顯示在左下角，讓使用者親手點，確認 iOS 到底會不會給觸覺
+  H.showSwitch = function () {
+    if (!swInput) return;
+    swInput.style.cssText = "position:fixed;left:16px;bottom:120px;z-index:9999;transform:scale(1.6);transform-origin:left bottom;opacity:1;pointer-events:auto;width:auto;height:auto";
+  };
+
   function init() { makeButton(); setupHaptic(); }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);

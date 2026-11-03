@@ -34,6 +34,12 @@ func _ready() -> void:
 		haptic_mode = str(_haptic.mode) if _haptic != null else "none"
 
 
+## 把真正的 iOS switch 顯示出來讓使用者親手點（排除「程式模擬點擊不觸發觸覺」的可能）
+func show_haptic_switch() -> void:
+	if _haptic != null:
+		_haptic.showSwitch()
+
+
 ## 震動：count 連點幾下。強擊 1、弱擊 2、漏接 3。
 func haptic(count: int = 1, gap_ms: int = 70) -> void:
 	if _haptic != null:

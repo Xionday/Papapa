@@ -78,6 +78,8 @@ var _up_hist: Array[Vector2] = []           ## (time, up_accel)，保留最近 1
 const HIST_KEEP := 1.0
 
 @onready var _sensor: Node = $SensorBridge
+@onready var _sfx: Node = $Sfx
+var _apex_ticked: bool = false
 
 
 func _ready() -> void:
@@ -132,6 +134,7 @@ func _serve() -> void:
 	last_grade = ""
 	round_log = []
 	_t_visible = -1.0
+	_apex_ticked = false
 	_launch_timing()
 
 
@@ -217,6 +220,11 @@ func _step_air(delta: float) -> void:
 	ball_pos += v_lat * delta
 	_clamp_to_screen()
 
+	## 最高點：收縮環出現的那一刻給一個 tick（用身體數拍子）
+	if not _apex_ticked and _now() >= _t_apex:
+		_apex_ticked = true
+		_sfx.play("tick")
+
 	## 下落中第一次進入可見高度 → 判定視窗開始
 	if _t_visible < 0.0 and v_up < 0.0 and ball_h <= show_height:
 		_t_visible = _now()
@@ -256,17 +264,20 @@ func _judge() -> void:
 			last_launch = full_launch
 			_flash_color = Color(0.36, 0.79, 0.65)
 			_sensor.haptic(1)
+			_sfx.play("perfect")
 			_spawn_ash()
 		"good":
 			bad_count = 0
 			last_launch = full_launch * good_launch
 			_flash_color = Color(0.53, 0.72, 0.92)
 			_sensor.haptic(1)
+			_sfx.play("good")
 		_:
 			bad_count += 1
 			last_launch = last_launch * bad_launch
 			_flash_color = Color(0.98, 0.78, 0.46)
 			_sensor.haptic(2)
+			_sfx.play("miss" if grade == "miss" else "bad")
 	_flash = 1.0
 
 	if bad_count >= max_bad:
@@ -277,6 +288,7 @@ func _judge() -> void:
 		ball_stopped = true
 		_flash_color = Color(0.89, 0.29, 0.29)
 		_sensor.haptic(3)
+		_sfx.play("stop")
 		best_streak = max(best_streak, streak)
 		best_score = max(best_score, score)
 		stopped.emit(streak, score, round_stats())
@@ -292,6 +304,7 @@ func _judge() -> void:
 	var flight_t: float = 2.0 * v_up / gravity_m
 	v_lat += (paddle_pos - ball_pos) * center_strength / flight_t
 	_t_visible = -1.0
+	_apex_ticked = false
 	_launch_timing()
 	state = "air"
 	judged.emit(grade, last_dt, streak, score)

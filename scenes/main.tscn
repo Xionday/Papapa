@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
 [ext_resource type="Script" path="res://scripts/sensor_bridge.gd" id="2_sensor"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="3_hud"]
+[ext_resource type="Script" path="res://scripts/sfx.gd" id="4_sfx"]
 
 [sub_resource type="StyleBoxFlat" id="results_bg"]
 content_margin_left = 32.0
@@ -25,6 +26,9 @@ script = ExtResource("1_game")
 
 [node name="SensorBridge" type="Node" parent="."]
 script = ExtResource("2_sensor")
+
+[node name="Sfx" type="Node" parent="."]
+script = ExtResource("4_sfx")
 
 [node name="HUD" type="CanvasLayer" parent="."]
 script = ExtResource("3_hud")
@@ -102,7 +106,7 @@ anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 16.0
-offset_top = -760.0
+offset_top = -840.0
 offset_right = -16.0
 offset_bottom = -110.0
 grow_horizontal = 2
@@ -118,6 +122,30 @@ text = "tuning (resets on reload)"
 
 [node name="Sliders" type="VBoxContainer" parent="HUD/Panel/VBox"]
 layout_mode = 2
+
+[node name="Tests" type="HBoxContainer" parent="HUD/Panel/VBox"]
+layout_mode = 2
+
+[node name="TestHaptic" type="Button" parent="HUD/Panel/VBox/Tests"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 56)
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "test haptic (auto)"
+
+[node name="ShowSwitch" type="Button" parent="HUD/Panel/VBox/Tests"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 56)
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "show real switch"
+
+[node name="TestSound" type="Button" parent="HUD/Panel/VBox/Tests"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 56)
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "test sound"
 
 [node name="Results" type="PanelContainer" parent="HUD"]
 anchors_preset = -1
