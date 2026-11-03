@@ -62,6 +62,9 @@ func _ready() -> void:
 	_zero_btn.pressed.connect(func():
 		_game.calibrate_tilt()
 		_show_msg("tilt zeroed"))
+	## tune 面板與按鈕排在最上層，結算與選單都蓋不住它
+	move_child($Buttons, -1)
+	move_child(_panel, -1)
 	_results.visible = false
 	_menu.visible = true
 	_endless_btn.pressed.connect(func():
