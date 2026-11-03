@@ -22,7 +22,7 @@ signal pushed(step: Vector2)
 @export var move_deadzone: float = 0.6      ## m/s²，低於這個的水平加速度視為噪音
 @export var move_damping: float = 5.0       ## 1/s，速度衰減；越大「推一下」越短促
 @export var px_per_m: float = 2500.0        ## 手機移 10 cm ≈ 畫面移 250 px
-@export var center_strength: float = 0.8    ## 每次拍起，球在飛行中回到螢幕中心的比例（0 = 不回中）
+@export var center_strength: float = 0.0    ## 每次拍起，球在飛行中回到螢幕中心的比例（0 = 不回中）
 @export var edge_margin: float = 40.0       ## px，球離螢幕邊緣最少保留
 @export var good_launch: float = 0.9        ## GOOD 的起跳速度倍率
 @export var bad_launch: float = 0.6         ## BAD / MISS 的起跳速度倍率
