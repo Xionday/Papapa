@@ -4,7 +4,8 @@ extends Node
 ## 原生 iOS/Android：讀 Input.get_accelerometer / get_gravity。
 ## 之後 Ball 只跟這個節點講話，不管底層是哪個平台。
 
-## 每幀發出。linear 不含重力，gravity 含重力方向，兩者都是 m/s²。
+## 每幀發出。linear = 裝置真實加速度（不含重力）；gravity = 物理重力方向（平放時 z ≈ −9.8）。
+## 都是裝置座標、m/s²。Web 端的值已由 motion.js 統一成 W3C 規格慣例。
 signal sample(linear: Vector3, gravity: Vector3)
 
 var _js: JavaScriptObject = null
@@ -59,7 +60,9 @@ func _read_web() -> void:
 		return
 	_last_seq = seq
 	linear = Vector3(float(_js.ax), float(_js.ay), float(_js.az))
-	gravity = Vector3(float(_js.gx), float(_js.gy), float(_js.gz)) - linear
+	## 規格：accelerationIncludingGravity = linear + 支撐力；支撐力 = −物理重力
+	var reaction := Vector3(float(_js.gx), float(_js.gy), float(_js.gz)) - linear
+	gravity = -reaction
 	rotation_rate = Vector3(float(_js.rx), float(_js.ry), float(_js.rz))
 	hz = int(_js.hz)
 	interval_ms = float(_js.interval)

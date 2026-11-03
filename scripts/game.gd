@@ -236,10 +236,12 @@ func _judge() -> void:
 		grade = "miss"
 		last_dt = 0.0
 	else:
-		last_dt = abs(peak.x - _t_land)
-		if last_dt <= perfect_dt:
+		## 帶正負號：負 = 揮在落地前，正 = 揮在落地後
+		last_dt = peak.x - _t_land
+		var adt: float = abs(last_dt)
+		if adt <= perfect_dt:
 			grade = "perfect"
-		elif last_dt <= good_dt:
+		elif adt <= good_dt:
 			grade = "good"
 		else:
 			grade = "bad"

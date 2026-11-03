@@ -16,12 +16,19 @@
   };
   window.papapaMotion = M;
 
+  // iOS Safari 回傳的加速度正負號與 W3C 規格相反（規格：平放時 accelerationIncludingGravity.z ≈ +9.8，
+  // iOS 給 −9.8）。這裡把 iOS 的兩組向量取負，讓 GDScript 永遠收到規格慣例的值。
+  var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  var sign = isIOS ? -1 : 1;
+  M.sign = sign;
+
   var count = 0, lastTick = performance.now();
 
   function onMotion(e) {
     var a = e.acceleration, g = e.accelerationIncludingGravity, r = e.rotationRate;
-    if (a) { M.ax = a.x || 0; M.ay = a.y || 0; M.az = a.z || 0; }
-    if (g) { M.gx = g.x || 0; M.gy = g.y || 0; M.gz = g.z || 0; }
+    if (a) { M.ax = sign * (a.x || 0); M.ay = sign * (a.y || 0); M.az = sign * (a.z || 0); }
+    if (g) { M.gx = sign * (g.x || 0); M.gy = sign * (g.y || 0); M.gz = sign * (g.z || 0); }
     if (r) { M.rx = r.alpha || 0; M.ry = r.beta || 0; M.rz = r.gamma || 0; }
     M.interval = e.interval || 0;
     M.seq++;

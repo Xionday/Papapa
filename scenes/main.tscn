@@ -1,8 +1,24 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
 [ext_resource type="Script" path="res://scripts/sensor_bridge.gd" id="2_sensor"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="3_hud"]
+
+[sub_resource type="StyleBoxFlat" id="results_bg"]
+content_margin_left = 32.0
+content_margin_top = 32.0
+content_margin_right = 32.0
+content_margin_bottom = 32.0
+bg_color = Color(0.11, 0.11, 0.1, 0.97)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 1, 1, 0.15)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_game")
@@ -115,6 +131,7 @@ offset_right = 320.0
 offset_bottom = 330.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_styles/panel = SubResource("results_bg")
 
 [node name="VBox" type="VBoxContainer" parent="HUD/Results"]
 layout_mode = 2

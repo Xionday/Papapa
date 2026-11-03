@@ -112,9 +112,10 @@ func _on_stopped(streak: int, score: int, st: Dictionary) -> void:
 		"",
 		"perfect %d   good %d   bad %d   miss %d" % [c["perfect"], c["good"], c["bad"], c["miss"]],
 		"",
-		"timing offset (swing vs landing), %d hits" % st["hits"],
-		"  avg %.0f ms   median %.0f ms" % [st["dt_avg"] * 1000.0, st["dt_med"] * 1000.0],
-		"  min %.0f ms   max %.0f ms" % [st["dt_min"] * 1000.0, st["dt_max"] * 1000.0],
+		"timing offset (swing - landing), %d hits" % st["hits"],
+		"  - = early, + = late",
+		"  avg %+.0f ms   median %+.0f ms" % [st["dt_avg"] * 1000.0, st["dt_med"] * 1000.0],
+		"  min %+.0f ms   max %+.0f ms" % [st["dt_min"] * 1000.0, st["dt_max"] * 1000.0],
 		"swing peak avg %.1f m/s²" % st["peak_avg"],
 		"",
 		"windows: perfect <= %.0f ms, good <= %.0f ms" % [_game.perfect_dt * 1000.0, _game.good_dt * 1000.0],
@@ -134,6 +135,7 @@ func _process(delta: float) -> void:
 	_judge_timer -= delta
 	if _judge_timer <= 0.0:
 		_judge.text = ""
+	_debug.visible = not _results.visible
 	_combo.text = "combo %d   (best %d)" % [_game.streak, _game.best_streak]
 	_score.text = "%d" % _game.score
 	_debug.text = "\n".join([
