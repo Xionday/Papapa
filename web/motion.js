@@ -94,15 +94,17 @@
     swLabel.style.cssText = hide;
     document.body.appendChild(swInput);
     document.body.appendChild(swLabel);
-    H.supported = true;
-    H.mode = "switch";
+    // 實測 iOS 18.7：親手點 switch 會震，程式 label.click() 不會。
+    // 元件留著給 showSwitch() 除錯用，但對遊戲來說等於沒有震動。
+    H.supported = false;
+    H.mode = "web-none";
   }
 
   // count: 連點幾下；gap: 間隔 ms
   H.tap = function (count, gap) {
     count = count || 1; gap = gap || 70;
     if (H.mode === "vibrate") { var p = []; for (var i = 0; i < count; i++) { p.push(30); p.push(gap); } navigator.vibrate(p); return; }
-    if (H.mode !== "switch") return;
+    if (H.mode !== "switch") return; // web-none：什麼都不做
     var n = 0;
     (function step() {
       swLabel.click();
