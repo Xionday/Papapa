@@ -22,10 +22,23 @@ offset_right = -24.0
 grow_horizontal = 2
 mouse_filter = 2
 
+[node name="Combo" type="Label" parent="HUD/Top"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.7)
+theme_override_font_sizes/font_size = 28
+text = "combo 0   (best 0)"
+horizontal_alignment = 1
+
 [node name="Score" type="Label" parent="HUD/Top"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 64
-text = "0   best 0"
+theme_override_font_sizes/font_size = 96
+text = "0"
+horizontal_alignment = 1
+
+[node name="Judge" type="Label" parent="HUD/Top"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 56
+text = ""
 horizontal_alignment = 1
 
 [node name="Msg" type="Label" parent="HUD/Top"]
@@ -73,7 +86,7 @@ anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 16.0
-offset_top = -620.0
+offset_top = -760.0
 offset_right = -16.0
 offset_bottom = -110.0
 grow_horizontal = 2

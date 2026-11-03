@@ -1,34 +1,44 @@
 extends CanvasLayer
-## HUD：分數、除錯數值、參數滑桿。文字先用英文（Web 版沒有 CJK 字型）。
+## HUD：連擊(小、上)、分數(大)、判定字樣、除錯數值、參數滑桿。文字先用英文（Web 版沒有 CJK 字型）。
 
 @onready var _game: Node2D = get_parent()
 @onready var _sensor: Node = get_parent().get_node("SensorBridge")
+@onready var _combo: Label = $Top/Combo
 @onready var _score: Label = $Top/Score
+@onready var _judge: Label = $Top/Judge
+@onready var _msg: Label = $Top/Msg
 @onready var _debug: Label = $Top/Debug
 @onready var _panel: PanelContainer = $Panel
 @onready var _sliders_box: VBoxContainer = $Panel/VBox/Sliders
 @onready var _tune_btn: Button = $Buttons/Tune
 @onready var _zero_btn: Button = $Buttons/Zero
-@onready var _msg: Label = $Top/Msg
 
 ## name, property, min, max, step
 const PARAMS := [
 	["hit threshold m/s²", "hit_threshold", 0.5, 10.0, 0.25],
-	["hit window s", "hit_window", 0.05, 0.5, 0.01],
+	["perfect window s", "perfect_dt", 0.02, 0.2, 0.01],
+	["good window s", "good_dt", 0.05, 0.4, 0.01],
+	["grace after land s", "grace_after", 0.0, 0.3, 0.01],
 	["move px per m", "px_per_m", 0.0, 4000.0, 100.0],
 	["move damping", "move_damping", 1.0, 12.0, 0.5],
 	["move deadzone m/s²", "move_deadzone", 0.0, 2.0, 0.1],
 	["center strength", "center_strength", 0.0, 1.0, 0.05],
-	["decay (1st weak)", "decay", 0.3, 0.95, 0.05],
+	["bad launch x", "bad_launch", 0.3, 0.95, 0.05],
 	["full launch m/s", "full_launch", 3.0, 9.0, 0.1],
 	["lateral gain", "lateral_gain", 0.0, 400.0, 10.0],
 	["show height m", "show_height", 0.2, 1.5, 0.05],
 ]
 
-var _value_labels: Dictionary = {}
+const GRADE_COLOR := {
+	"perfect": Color(0.36, 0.79, 0.65),
+	"good": Color(0.53, 0.72, 0.92),
+	"bad": Color(0.98, 0.78, 0.46),
+	"miss": Color(0.98, 0.6, 0.3),
+}
+
 var _msg_timer: float = 0.0
+var _judge_timer: float = 0.0
 var _last_event: String = ""
-var _last_move: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
@@ -37,12 +47,8 @@ func _ready() -> void:
 	_zero_btn.pressed.connect(func():
 		_game.calibrate_tilt()
 		_show_msg("tilt zeroed"))
-	_game.hit.connect(_on_hit)
-	_game.missed.connect(_on_missed)
-	_game.stopped.connect(func(streak: int):
-		_last_event = "STOPPED after %d (two weak hits)" % streak
-		_show_msg("ball stopped - swing up!"))
-	_game.pushed.connect(_on_pushed)
+	_game.judged.connect(_on_judged)
+	_game.stopped.connect(_on_stopped)
 	_build_sliders()
 
 
@@ -64,7 +70,6 @@ func _build_sliders() -> void:
 		val_l.custom_minimum_size.x = 90
 		val_l.add_theme_font_size_override("font_size", 22)
 		val_l.text = _fmt(slider.value)
-		_value_labels[p[1]] = val_l
 		var prop: String = p[1]
 		slider.value_changed.connect(func(v: float):
 			_game.set(prop, v)
@@ -79,35 +84,38 @@ func _fmt(v: float) -> String:
 	return "%.2f" % v if v < 10.0 else "%.0f" % v
 
 
-func _on_hit(strong: bool, streak: int) -> void:
-	_last_event = "HIT %s  peak %.1f  launch %.1f" % ["strong" if strong else "weak", _game.last_hit_peak, _game.last_launch]
-	if not strong:
-		_show_msg("weak hit, swing up harder")
+func _on_judged(grade: String, dt: float, streak: int, score: int) -> void:
+	_judge.text = grade.to_upper()
+	_judge.add_theme_color_override("font_color", GRADE_COLOR[grade])
+	_judge_timer = 0.7
+	_last_event = "%s  dt %+.0f ms  peak %.1f  launch %.1f" % [grade, dt * 1000.0, _game.last_peak, _game.last_launch]
 
 
-func _on_missed(streak: int) -> void:
-	_last_event = "MISS after %d" % streak
-	_show_msg("missed  (%d)" % streak)
-
-
-func _on_pushed(step: Vector2) -> void:
-	_last_move = step
+func _on_stopped(streak: int, score: int) -> void:
+	_judge.text = "STOPPED"
+	_judge.add_theme_color_override("font_color", Color(0.89, 0.29, 0.29))
+	_judge_timer = 1.5
+	_show_msg("combo %d   score %d" % [streak, score])
+	_last_event = "STOPPED  last %s  peak %.1f" % [_game.last_grade, _game.last_peak]
 
 
 func _show_msg(t: String) -> void:
 	_msg.text = t
-	_msg_timer = 1.2
+	_msg_timer = 1.5
 
 
 func _process(delta: float) -> void:
 	_msg_timer -= delta
 	if _msg_timer <= 0.0:
 		_msg.text = ""
-	_score.text = "%d   best %d" % [_game.streak, _game.best]
+	_judge_timer -= delta
+	if _judge_timer <= 0.0:
+		_judge.text = ""
+	_combo.text = "combo %d   (best %d)" % [_game.streak, _game.best_streak]
+	_score.text = "%d" % _game.score
 	_debug.text = "\n".join([
 		"sensor %s  %d Hz  fps %d  haptic %s" % [_sensor.status, _sensor.hz, Engine.get_frames_per_second(), _sensor.haptic_mode],
-		"up accel %+5.1f   horiz %4.1f" % [_game.up_accel, _game.horiz_accel.length()],
-		"tilt x %+4.1f y %+4.1f   height %.2f m" % [_game.tilt.x, _game.tilt.y, _game.ball_h],
-		"phone vel %+.2f %+.2f m/s   paddle %+.0f %+.0f" % [_game.phone_vel.x, _game.phone_vel.y, _game.paddle_pos.x, _game.paddle_pos.y],
+		"up accel %+5.1f   horiz %4.1f   h %.2f m" % [_game.up_accel, _game.horiz_accel.length(), _game.ball_h],
+		"tilt %+4.1f %+4.1f   phone vel %+.2f %+.2f" % [_game.tilt.x, _game.tilt.y, _game.phone_vel.x, _game.phone_vel.y],
 		_last_event,
 	])
