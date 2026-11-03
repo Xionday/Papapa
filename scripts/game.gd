@@ -24,7 +24,8 @@ signal pushed(step: Vector2)
 @export var move_damping: float = 0.0       ## 1/s，速度衰減（0 = 純積分，靠 ZUPT 歸零）
 @export var move_lowpass: float = 0.05      ## s，加速度低通時間常數
 @export var move_zupt: float = 0.15         ## s，連續安靜這麼久就把速度歸零（zero-velocity update）
-@export var px_per_m: float = 2500.0        ## 手機移 10 cm ≈ 畫面移 250 px
+@export var px_per_m: float = 10300.0       ## 由 screen_width_cm 算出：要讓球釘在世界，1 cm 的位移必須等於螢幕上 1 cm 的像素
+@export var screen_width_cm: float = 7.0    ## 螢幕實體寬度（iPhone 約 6.5–7.2），start_game 時用它算 px_per_m
 @export var center_strength: float = 0.0    ## 每次拍起，球在飛行中回到螢幕中心的比例（0 = 不回中）
 @export var edge_margin: float = 40.0       ## px，球離螢幕邊緣最少保留（endless 模式）
 @export var clamp_in_zone_mode: bool = false ## 光圈模式不鎖邊界：球釘在世界裡，鏡頭怎麼移都不會被推著走
@@ -131,6 +132,7 @@ func _ready() -> void:
 ## 從選單開始：mode = "endless" | "zone"
 func start_game(mode: String) -> void:
 	zone_mode = (mode == "zone")
+	px_per_m = get_viewport_rect().size.x / (screen_width_cm / 100.0)
 	if zone_mode:
 		full_launch = zone_launch
 		lateral_gain = zone_lateral_gain
