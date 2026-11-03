@@ -47,7 +47,7 @@ const ZONE_STAGES := [
 ]
 ## 光圈模式的物理：彈得更高（有時間瞄）、傾斜飄得更少（不會一下跑太遠）
 @export var zone_launch: float = 7.2        ## m/s，滯空約 1.5 秒（endless 是 5.9 ≈ 1.2 秒）
-@export var zone_lateral_gain: float = 60.0 ## endless 是 150
+@export var zone_lateral_gain: float = 0.0  ## 暫時關閉傾斜飄移，單獨測位移（endless 是 150）
 @export var endless_launch: float = 5.9
 @export var endless_lateral_gain: float = 150.0
 @export var zone_scale: float = 1.0         ## 全部半徑的倍率（tune 用）
