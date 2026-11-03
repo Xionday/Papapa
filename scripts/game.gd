@@ -13,7 +13,7 @@ signal pushed(step: Vector2)
 
 ## ---- 可調參數（HUD 的滑桿會改這些）----
 @export var hit_threshold: float = 1.25     ## m/s²，向上加速度要超過這個才算有揮
-@export var timing_bias: float = 0.0        ## s，perfect 的中心點相對落地的偏移（負 = 允許提早揮）
+@export var timing_bias: float = -0.05       ## s，perfect 的中心點相對落地的偏移（負 = 允許提早揮）
 @export var grace_after: float = 0.08       ## s，落地後再等多久才結算（讓晚一點揮也算得到）
 @export var perfect_dt: float = 0.05        ## s，|揮擊 − 落地| 在這之內 = PERFECT
 @export var good_dt: float = 0.12           ## s，在這之內 = GOOD；再外面 = BAD
