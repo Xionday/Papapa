@@ -9,9 +9,11 @@ signal stopped(streak: int)   ## 連續兩次沒用力，球停在拍面上
 signal pushed(dir: Vector2)
 
 ## ---- 可調參數（HUD 的滑桿會改這些）----
-@export var hit_threshold: float = 5.0      ## m/s²，接球瞬間附近要有這麼大的向上加速度才算「有用力」
-@export var hit_window: float = 0.15        ## s，往回看多久
+@export var hit_threshold: float = 2.0      ## m/s²，接球瞬間附近要有這麼大的向上加速度才算「有用力」（靜止噪音約 0.8）
+@export var hit_window: float = 0.25        ## s，往回看多久
+@export var push_enabled: bool = false      ## 推動暫時關閉：球先限制在螢幕內
 @export var push_threshold: float = 3.0     ## m/s²，水平加速度超過就算「推一下」
+@export var edge_margin: float = 40.0       ## px，球離螢幕邊緣最少保留
 @export var push_distance: float = 300.0    ## px，推一下球拍在世界裡移動多遠
 @export var push_cooldown: float = 0.35     ## s
 @export var decay: float = 0.6              ## 第一次沒用力：下一次起跳速度 = 上次 × decay
@@ -114,9 +116,10 @@ func _step_air(delta: float) -> void:
 	ball_h += v_up * delta
 	v_up -= gravity_m * delta
 	ball_pos += v_lat * delta
+	_clamp_to_screen()
 
 	## 推一下：球在空中、水平加速度夠大、冷卻結束
-	if ball_h > 0.15 and _push_timer <= 0.0 and horiz_accel.length() >= push_threshold:
+	if push_enabled and ball_h > 0.15 and _push_timer <= 0.0 and horiz_accel.length() >= push_threshold:
 		var dir := horiz_accel.normalized()
 		_paddle_target += dir * push_distance
 		_push_timer = push_cooldown
@@ -161,6 +164,18 @@ func _step_air(delta: float) -> void:
 			_flash_color = Color(0.89, 0.29, 0.29)
 			_sensor.haptic(3)
 			missed.emit(streak)
+
+
+## 球限制在螢幕內：撞到邊就停在邊上，橫向速度歸零
+func _clamp_to_screen() -> void:
+	var half := get_viewport_rect().size * 0.5 - Vector2(edge_margin, edge_margin)
+	var d := ball_pos - paddle_pos
+	var c := Vector2(clamp(d.x, -half.x, half.x), clamp(d.y, -half.y, half.y))
+	if c.x != d.x:
+		v_lat.x = 0.0
+	if c.y != d.y:
+		v_lat.y = 0.0
+	ball_pos = paddle_pos + c
 
 
 func _on_paddle() -> bool:

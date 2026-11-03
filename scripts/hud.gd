@@ -13,8 +13,8 @@ extends CanvasLayer
 
 ## name, property, min, max, step
 const PARAMS := [
-	["hit threshold m/s²", "hit_threshold", 1.0, 15.0, 0.5],
-	["hit window s", "hit_window", 0.05, 0.4, 0.01],
+	["hit threshold m/s²", "hit_threshold", 0.5, 10.0, 0.25],
+	["hit window s", "hit_window", 0.05, 0.5, 0.01],
 	["push threshold m/s²", "push_threshold", 1.0, 10.0, 0.5],
 	["push distance px", "push_distance", 100.0, 600.0, 10.0],
 	["decay (1st weak)", "decay", 0.3, 0.95, 0.05],
