@@ -1,29 +1,91 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
-[ext_resource type="Script" path="res://scripts/sensor_bridge.gd" id="1_sensor"]
-[ext_resource type="Script" path="res://scripts/hud.gd" id="2_hud"]
+[ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
+[ext_resource type="Script" path="res://scripts/sensor_bridge.gd" id="2_sensor"]
+[ext_resource type="Script" path="res://scripts/hud.gd" id="3_hud"]
 
 [node name="Main" type="Node2D"]
+script = ExtResource("1_game")
 
 [node name="SensorBridge" type="Node" parent="."]
-script = ExtResource("1_sensor")
+script = ExtResource("2_sensor")
 
 [node name="HUD" type="CanvasLayer" parent="."]
-script = ExtResource("2_hud")
+script = ExtResource("3_hud")
 
-[node name="Margin" type="MarginContainer" parent="HUD"]
-anchors_preset = 15
+[node name="Top" type="VBoxContainer" parent="HUD"]
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 24.0
+offset_top = 110.0
+offset_right = -24.0
+grow_horizontal = 2
+mouse_filter = 2
+
+[node name="Score" type="Label" parent="HUD/Top"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 64
+text = "0   best 0"
+horizontal_alignment = 1
+
+[node name="Msg" type="Label" parent="HUD/Top"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.98, 0.78, 0.46, 1)
+theme_override_font_sizes/font_size = 30
+text = ""
+horizontal_alignment = 1
+
+[node name="Debug" type="Label" parent="HUD/Top"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.55)
+theme_override_font_sizes/font_size = 22
+text = ""
+
+[node name="Buttons" type="HBoxContainer" parent="HUD"]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/margin_left = 32
-theme_override_constants/margin_top = 120
-theme_override_constants/margin_right = 32
-theme_override_constants/margin_bottom = 32
+offset_left = -300.0
+offset_top = -100.0
+offset_right = -24.0
+offset_bottom = -32.0
+grow_horizontal = 0
+grow_vertical = 0
+alignment = 2
 
-[node name="Label" type="Label" parent="HUD/Margin"]
+[node name="Zero" type="Button" parent="HUD/Buttons"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
-autowrap_mode = 3
-text = "等待感測器…"
+custom_minimum_size = Vector2(120, 64)
+theme_override_font_sizes/font_size = 24
+text = "zero"
+
+[node name="Tune" type="Button" parent="HUD/Buttons"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 64)
+theme_override_font_sizes/font_size = 24
+text = "tune"
+
+[node name="Panel" type="PanelContainer" parent="HUD"]
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -620.0
+offset_right = -16.0
+offset_bottom = -110.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="VBox" type="VBoxContainer" parent="HUD/Panel"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="HUD/Panel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "tuning (resets on reload)"
+
+[node name="Sliders" type="VBoxContainer" parent="HUD/Panel/VBox"]
+layout_mode = 2
