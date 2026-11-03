@@ -8,7 +8,7 @@ extends Node2D
 ## 這段期間沒有任何一筆超過 hit_threshold → MISS，當 BAD 算。BAD 連兩次 → 球停住、回合結束。
 
 signal judged(grade: String, dt: float, streak: int, score: int)
-signal stopped(streak: int, score: int)
+signal stopped(streak: int, score: int, stats: Dictionary)
 signal pushed(step: Vector2)
 
 ## ---- 可調參數（HUD 的滑桿會改這些）----
@@ -64,6 +64,7 @@ var _ring_gold_pos: Vector2 = Vector2.ZERO
 var last_grade: String = ""
 var last_dt: float = 0.0
 var last_peak: float = 0.0
+var round_log: Array = []                   ## 這局每一次判定 {grade, dt, peak}
 
 ## 感測器
 var up_dir: Vector3 = Vector3(0, 0, 1)
@@ -127,8 +128,43 @@ func _serve() -> void:
 	bad_count = 0
 	ball_stopped = false
 	last_grade = ""
+	round_log = []
 	_t_visible = -1.0
 	_launch_timing()
+
+
+func play_again() -> void:
+	if state == "dead":
+		_serve()
+
+
+## 這局的統計，給結算畫面
+func round_stats() -> Dictionary:
+	var counts := {"perfect": 0, "good": 0, "bad": 0, "miss": 0}
+	var dts: Array[float] = []
+	var peaks: Array[float] = []
+	for e in round_log:
+		counts[e["grade"]] += 1
+		if e["grade"] != "miss":
+			dts.append(e["dt"])
+		if e["peak"] > 0.0:
+			peaks.append(e["peak"])
+	dts.sort()
+	var st := {"counts": counts, "hits": dts.size(), "dt_avg": 0.0, "dt_med": 0.0, "dt_min": 0.0, "dt_max": 0.0, "peak_avg": 0.0}
+	if dts.size() > 0:
+		var sum := 0.0
+		for d in dts:
+			sum += d
+		st["dt_avg"] = sum / dts.size()
+		st["dt_med"] = dts[dts.size() / 2]
+		st["dt_min"] = dts[0]
+		st["dt_max"] = dts[dts.size() - 1]
+	if peaks.size() > 0:
+		var ps := 0.0
+		for pk in peaks:
+			ps += pk
+		st["peak_avg"] = ps / peaks.size()
+	return st
 
 
 ## 起跳瞬間算出理論最高點與落地時刻（收縮環用）
@@ -152,9 +188,7 @@ func _process(delta: float) -> void:
 			if _settle_timer <= 0.0:
 				_judge()
 		"dead":
-			_dead_timer -= delta
-			if _dead_timer <= 0.0:
-				_serve()
+			pass  ## 等結算畫面的 play again
 	queue_redraw()
 
 
@@ -210,6 +244,7 @@ func _judge() -> void:
 		else:
 			grade = "bad"
 	last_grade = grade
+	round_log.append({"grade": grade, "dt": last_dt, "peak": last_peak})
 
 	match grade:
 		"perfect":
@@ -240,7 +275,7 @@ func _judge() -> void:
 		_sensor.haptic(3)
 		best_streak = max(best_streak, streak)
 		best_score = max(best_score, score)
-		stopped.emit(streak, score)
+		stopped.emit(streak, score, round_stats())
 		return
 
 	streak += 1

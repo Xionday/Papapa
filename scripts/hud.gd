@@ -12,6 +12,9 @@ extends CanvasLayer
 @onready var _sliders_box: VBoxContainer = $Panel/VBox/Sliders
 @onready var _tune_btn: Button = $Buttons/Tune
 @onready var _zero_btn: Button = $Buttons/Zero
+@onready var _results: PanelContainer = $Results
+@onready var _results_text: Label = $Results/VBox/Text
+@onready var _again_btn: Button = $Results/VBox/PlayAgain
 
 ## name, property, min, max, step
 const PARAMS := [
@@ -47,6 +50,10 @@ func _ready() -> void:
 	_zero_btn.pressed.connect(func():
 		_game.calibrate_tilt()
 		_show_msg("tilt zeroed"))
+	_results.visible = false
+	_again_btn.pressed.connect(func():
+		_results.visible = false
+		_game.play_again())
 	_game.judged.connect(_on_judged)
 	_game.stopped.connect(_on_stopped)
 	_build_sliders()
@@ -91,12 +98,28 @@ func _on_judged(grade: String, dt: float, streak: int, score: int) -> void:
 	_last_event = "%s  dt %+.0f ms  peak %.1f  launch %.1f" % [grade, dt * 1000.0, _game.last_peak, _game.last_launch]
 
 
-func _on_stopped(streak: int, score: int) -> void:
+func _on_stopped(streak: int, score: int, st: Dictionary) -> void:
 	_judge.text = "STOPPED"
 	_judge.add_theme_color_override("font_color", Color(0.89, 0.29, 0.29))
 	_judge_timer = 1.5
-	_show_msg("combo %d   score %d" % [streak, score])
 	_last_event = "STOPPED  last %s  peak %.1f" % [_game.last_grade, _game.last_peak]
+	var c: Dictionary = st["counts"]
+	_results_text.text = "\n".join([
+		"ROUND OVER",
+		"",
+		"score   %d   (best %d)" % [score, _game.best_score],
+		"combo   %d   (best %d)" % [streak, _game.best_streak],
+		"",
+		"perfect %d   good %d   bad %d   miss %d" % [c["perfect"], c["good"], c["bad"], c["miss"]],
+		"",
+		"timing offset (swing vs landing), %d hits" % st["hits"],
+		"  avg %.0f ms   median %.0f ms" % [st["dt_avg"] * 1000.0, st["dt_med"] * 1000.0],
+		"  min %.0f ms   max %.0f ms" % [st["dt_min"] * 1000.0, st["dt_max"] * 1000.0],
+		"swing peak avg %.1f m/s²" % st["peak_avg"],
+		"",
+		"windows: perfect <= %.0f ms, good <= %.0f ms" % [_game.perfect_dt * 1000.0, _game.good_dt * 1000.0],
+	])
+	_results.visible = true
 
 
 func _show_msg(t: String) -> void:

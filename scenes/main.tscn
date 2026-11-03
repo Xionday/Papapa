@@ -102,3 +102,33 @@ text = "tuning (resets on reload)"
 
 [node name="Sliders" type="VBoxContainer" parent="HUD/Panel/VBox"]
 layout_mode = 2
+
+[node name="Results" type="PanelContainer" parent="HUD"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -320.0
+offset_top = -330.0
+offset_right = 320.0
+offset_bottom = 330.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="HUD/Results"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="Text" type="Label" parent="HUD/Results/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 26
+text = ""
+vertical_alignment = 1
+
+[node name="PlayAgain" type="Button" parent="HUD/Results/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 88)
+theme_override_font_sizes/font_size = 32
+text = "play again"
