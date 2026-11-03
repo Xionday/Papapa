@@ -74,7 +74,7 @@ var _t_land: float = 0.0                    ## 這次落地時刻
 var _t_apex: float = 0.0                    ## 這次彈起的理論最高點時刻（收縮環從這裡開始）
 var _t_land_pred: float = 0.0               ## 理論落地時刻
 var _ash: Array = []                        ## PERFECT 的灰燼粒子 {p, v, life, r}
-var zone_pos: Vector2 = Vector2.ZERO        ## 光圈世界座標
+var zone_pos: Vector2 = Vector2.ZERO        ## 光圈「螢幕」座標：釘在畫面上、跟著鏡頭走
 var zone_r: float = 180.0
 var zone_left: int = 2                      ## 還有幾次彈跳會換位置
 var zone_index: int = 0
@@ -231,7 +231,7 @@ func _zone_reset() -> void:
 	## 第一個圈放在拍面中心，讓開局不用追
 	var st := _zone_stage()
 	zone_index = 0
-	zone_pos = paddle_pos
+	zone_pos = get_viewport_rect().size * 0.5
 	zone_r = st[2] * zone_scale
 	zone_left = st[1]
 	_zone_fade = 0.0
@@ -245,11 +245,24 @@ func _zone_relocate() -> void:
 	_zone_old_r = zone_r
 	_zone_fade = 0.3
 	_zone_grow = 0.3
-	var dist: float = randf_range(st[3], st[4]) * zone_dist_scale
-	var ang: float = randf_range(0.0, TAU)
-	## 以球目前位置為基準，確保追得到
-	zone_pos = ball_pos + Vector2(cos(ang), sin(ang)) * dist
 	zone_r = st[2] * zone_scale
+	## 新位置：螢幕上的隨機點，離球目前的螢幕位置 dist_min~dist_max，且整個圈要在畫面內
+	var vp := get_viewport_rect().size
+	var lo := Vector2(zone_r + 24.0, zone_r + 140.0)
+	var hi := Vector2(vp.x - zone_r - 24.0, vp.y - zone_r - 150.0)
+	var from := _to_screen(ball_pos)
+	var best := zone_pos
+	var best_err := INF
+	for i in 24:
+		var dist: float = randf_range(st[3], st[4]) * zone_dist_scale
+		var ang: float = randf_range(0.0, TAU)
+		var cand := from + Vector2(cos(ang), sin(ang)) * dist
+		var cl := Vector2(clamp(cand.x, lo.x, hi.x), clamp(cand.y, lo.y, hi.y))
+		var err: float = cand.distance_to(cl) + (100.0 if cl.distance_to(from) < st[3] * 0.6 else 0.0)
+		if err < best_err:
+			best_err = err
+			best = cl
+	zone_pos = best
 	zone_left = st[1]
 	zone_index += 1
 	_sfx.play("zone")
@@ -257,7 +270,7 @@ func _zone_relocate() -> void:
 
 
 func _in_zone() -> bool:
-	return ball_pos.distance_to(zone_pos) <= zone_r
+	return _to_screen(ball_pos).distance_to(zone_pos) <= zone_r
 
 
 ## 起跳瞬間算出理論最高點與落地時刻（收縮環用）
@@ -541,37 +554,18 @@ const ZONE_COL := Color(0.55, 0.85, 1.0)
 
 
 func _draw_zone(vp: Vector2) -> void:
-	## 舊圈淡出
+	## 舊圈淡出（螢幕座標）
 	if _zone_fade > 0.0:
 		var f: float = _zone_fade / 0.3
-		draw_arc(_to_screen(_zone_old_pos), _zone_old_r * (1.0 + (1.0 - f) * 0.3), 0.0, TAU, 64, Color(ZONE_COL, 0.4 * f), 3.0)
+		draw_arc(_zone_old_pos, _zone_old_r * (1.0 + (1.0 - f) * 0.3), 0.0, TAU, 64, Color(ZONE_COL, 0.4 * f), 3.0)
 	## 現在的圈：剛出現時從小放大
-	var zp := _to_screen(zone_pos)
+	var zp := zone_pos
 	var g: float = 1.0 - _zone_grow / 0.3
 	g = 1.0 - (1.0 - g) * (1.0 - g)   ## ease-out
 	var r: float = zone_r * clamp(g, 0.05, 1.0)
 	var hit: float = _zone_hit_flash / 0.3
 	draw_circle(zp, r, Color(ZONE_COL, 0.08 + 0.25 * hit))
 	draw_arc(zp, r, 0.0, TAU, 64, Color(ZONE_COL, 0.7 + 0.3 * hit), 4.0 + 4.0 * hit)
-	## 剩幾次換位置：圈內畫小點
+	## 剩幾次換位置：圈下方小點
 	for i in zone_left:
 		draw_circle(zp + Vector2(-14.0 * (zone_left - 1) + 28.0 * i, r + 22.0), 5.0, Color(ZONE_COL, 0.9))
-
-	## 圈在畫面外：邊緣箭頭 + 距離
-	var margin := 40.0
-	if zp.x < -zone_r or zp.x > vp.x + zone_r or zp.y < -zone_r or zp.y > vp.y + zone_r:
-		var c := vp * 0.5
-		var dir := (zp - c).normalized()
-		## 和螢幕矩形（縮 margin）的交點
-		var half := c - Vector2(margin, margin)
-		var tx: float = half.x / max(abs(dir.x), 0.0001)
-		var ty: float = half.y / max(abs(dir.y), 0.0001)
-		var ep: Vector2 = c + dir * min(tx, ty)
-		var perp := Vector2(-dir.y, dir.x)
-		var tri := PackedVector2Array([ep + dir * 22.0, ep - dir * 10.0 + perp * 16.0, ep - dir * 10.0 - perp * 16.0])
-		draw_colored_polygon(tri, ZONE_COL)
-		var dist_px: float = (zone_pos - ball_pos).length()
-		var font := ThemeDB.fallback_font
-		var txt := "%d" % int(dist_px)
-		var tp: Vector2 = ep - dir * 48.0
-		draw_string(font, tp + Vector2(-20.0, 10.0), txt, HORIZONTAL_ALIGNMENT_CENTER, 40.0, 26, ZONE_COL)
