@@ -56,7 +56,11 @@ var _flash_color: Color = Color.WHITE
 ## 時機
 var _t_visible: float = -1.0                ## 球這次下落「出現」的時刻；-1 = 還沒出現
 var _t_land: float = 0.0                    ## 這次落地時刻
-var _t_fall_visible: float = 0.1            ## 出現到落地的理論時間（畫收縮環用）
+var _t_apex: float = 0.0                    ## 這次彈起的理論最高點時刻（收縮環從這裡開始）
+var _t_land_pred: float = 0.0               ## 理論落地時刻
+var _ash: Array = []                        ## PERFECT 的灰燼粒子 {p, v, life, r}
+var _ring_gold: float = 0.0                 ## PERFECT 後環變金色的殘留時間
+var _ring_gold_pos: Vector2 = Vector2.ZERO
 var last_grade: String = ""
 var last_dt: float = 0.0
 var last_peak: float = 0.0
@@ -124,21 +128,21 @@ func _serve() -> void:
 	ball_stopped = false
 	last_grade = ""
 	_t_visible = -1.0
-	_update_fall_time()
+	_launch_timing()
 
 
-## 從 show_height 落到 0 要多久（給收縮環用）
-func _update_fall_time() -> void:
-	var max_h: float = (v_up * v_up) / (2.0 * gravity_m)
-	var h0: float = min(show_height, max_h)
-	var v_at_h0: float = sqrt(max(0.0, 2.0 * gravity_m * (max_h - h0)))
-	## h0 = v_at_h0 t + g t²/2
-	_t_fall_visible = max(0.03, (-v_at_h0 + sqrt(v_at_h0 * v_at_h0 + 2.0 * gravity_m * h0)) / gravity_m)
+## 起跳瞬間算出理論最高點與落地時刻（收縮環用）
+func _launch_timing() -> void:
+	var t_half: float = v_up / gravity_m
+	_t_apex = _now() + t_half
+	_t_land_pred = _now() + 2.0 * t_half
 
 
 func _process(delta: float) -> void:
 	_flash = max(0.0, _flash - delta * 3.0)
+	_ring_gold = max(0.0, _ring_gold - delta)
 	_step_move(delta)
+	_step_ash(delta)
 
 	match state:
 		"air":
@@ -213,6 +217,7 @@ func _judge() -> void:
 			last_launch = full_launch
 			_flash_color = Color(0.36, 0.79, 0.65)
 			_sensor.haptic(1)
+			_spawn_ash()
 		"good":
 			bad_count = 0
 			last_launch = full_launch * good_launch
@@ -248,9 +253,39 @@ func _judge() -> void:
 	var flight_t: float = 2.0 * v_up / gravity_m
 	v_lat += (paddle_pos - ball_pos) * center_strength / flight_t
 	_t_visible = -1.0
-	_update_fall_time()
+	_launch_timing()
 	state = "air"
 	judged.emit(grade, last_dt, streak, score)
+
+
+## PERFECT：環變金色，碎成灰燼飄散
+func _spawn_ash() -> void:
+	_ring_gold = 0.5
+	_ring_gold_pos = ball_pos
+	_ash.clear()
+	var n := 36
+	for i in n:
+		var a: float = TAU * i / n + randf_range(-0.05, 0.05)
+		var dir := Vector2(cos(a), sin(a))
+		_ash.append({
+			"p": ball_pos + dir * BALL_R_LAND,
+			"v": dir * randf_range(40.0, 120.0) + Vector2(randf_range(-20.0, 20.0), randf_range(-90.0, -40.0)),
+			"life": randf_range(0.5, 0.9),
+			"max": 0.0,
+			"r": randf_range(2.0, 4.5),
+		})
+	for d in _ash:
+		d["max"] = d["life"]
+
+
+func _step_ash(delta: float) -> void:
+	if _ash.is_empty():
+		return
+	for d in _ash:
+		d["life"] -= delta
+		d["p"] += d["v"] * delta
+		d["v"] = d["v"] * exp(-1.5 * delta) + Vector2(randf_range(-30.0, 30.0), -25.0) * delta
+	_ash = _ash.filter(func(d): return d["life"] > 0.0)
 
 
 ## 球限制在螢幕內：撞到邊就停在邊上，橫向速度歸零
@@ -306,16 +341,24 @@ func _draw() -> void:
 	var k: float = clamp(ball_h / show_height, 0.0, 1.0)
 	var ball_r: float = lerp(BALL_R_LAND, BALL_R_HIGH, k)
 
-	## 收縮環：球出現前停在最大；出現後隨「距離落地的時間」縮到剛好貼住落地時的球
-	if state == "air" or state == "settle":
-		var ring_r: float = RING_R_MAX
-		if state == "settle":
-			ring_r = BALL_R_LAND
-		elif _t_visible >= 0.0:
-			var remain: float = clamp((_t_visible + _t_fall_visible - _now()) / _t_fall_visible, 0.0, 1.0)
-			ring_r = lerp(BALL_R_LAND, RING_R_MAX, remain)
-		var ring_a: float = 0.25 if _t_visible >= 0.0 else 0.12
-		draw_arc(sp, ring_r, 0.0, TAU, 64, Color(1, 1, 1, ring_a), 3.0)
+	## 收縮環：從最高點開始、由螢幕外等速縮進來，落地瞬間剛好貼住球與影子
+	var now := _now()
+	if state == "air" and now >= _t_apex:
+		var ring_start: float = vp.length() * 0.5 + 20.0
+		var u: float = clamp((now - _t_apex) / max(0.01, _t_land_pred - _t_apex), 0.0, 1.0)
+		var ring_r: float = lerp(ring_start, BALL_R_LAND, u)
+		draw_arc(sp, ring_r, 0.0, TAU, 96, Color(1, 1, 1, 0.3), 3.0)
+	elif state == "settle":
+		draw_arc(sp, BALL_R_LAND, 0.0, TAU, 64, Color(1, 1, 1, 0.3), 3.0)
+
+	## PERFECT 的金環殘影與灰燼
+	if _ring_gold > 0.0:
+		var gp := _to_screen(_ring_gold_pos)
+		var f: float = _ring_gold / 0.5
+		draw_arc(gp, BALL_R_LAND + (1.0 - f) * 30.0, 0.0, TAU, 64, Color(1.0, 0.84, 0.3, 0.8 * f), 3.0)
+	for d in _ash:
+		var f2: float = d["life"] / d["max"]
+		draw_circle(_to_screen(d["p"]), d["r"] * f2, Color(1.0, 0.8, 0.3, 0.9 * f2))
 
 	## 球：只有低於 show_height 才看得到，越高(越靠近眼睛)越大
 	if visible_ball:
