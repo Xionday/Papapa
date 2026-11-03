@@ -15,6 +15,10 @@ extends CanvasLayer
 @onready var _results: PanelContainer = $Results
 @onready var _results_text: Label = $Results/VBox/Text
 @onready var _again_btn: Button = $Results/VBox/PlayAgain
+@onready var _menu_btn: Button = $Results/VBox/Menu
+@onready var _menu: PanelContainer = $Menu
+@onready var _endless_btn: Button = $Menu/VBox/Endless
+@onready var _zone_mode_btn: Button = $Menu/VBox/Zone
 @onready var _test_haptic: Button = $Panel/VBox/Tests/TestHaptic
 @onready var _show_switch: Button = $Panel/VBox/Tests/ShowSwitch
 @onready var _test_sound: Button = $Panel/VBox/Tests/TestSound
@@ -58,6 +62,17 @@ func _ready() -> void:
 		_game.calibrate_tilt()
 		_show_msg("tilt zeroed"))
 	_results.visible = false
+	_menu.visible = true
+	_endless_btn.pressed.connect(func():
+		_menu.visible = false
+		_game.start_game("endless"))
+	_zone_mode_btn.pressed.connect(func():
+		_menu.visible = false
+		_game.start_game("zone"))
+	_menu_btn.pressed.connect(func():
+		_results.visible = false
+		_game.to_menu()
+		_menu.visible = true)
 	_again_btn.pressed.connect(func():
 		_results.visible = false
 		_game.play_again())
@@ -157,7 +172,8 @@ func _process(delta: float) -> void:
 	_judge_timer -= delta
 	if _judge_timer <= 0.0:
 		_judge.text = ""
-	_debug.visible = not _results.visible
+	_debug.visible = not _results.visible and not _menu.visible
+	$Top.visible = not _menu.visible
 	_combo.text = "combo %d   (best %d)" % [_game.streak, _game.best_streak]
 	_score.text = "%d" % _game.score
 	_debug.text = "\n".join([

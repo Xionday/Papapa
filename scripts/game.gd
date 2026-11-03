@@ -108,7 +108,27 @@ var _apex_ticked: bool = false
 
 func _ready() -> void:
 	_sensor.sample.connect(_on_sample)
+	state = "menu"
+	score = 0
+	streak = 0
+	ball_pos = paddle_pos
+	ball_h = 0.0
+	last_launch = full_launch
+
+
+## 從選單開始：mode = "endless" | "zone"
+func start_game(mode: String) -> void:
+	zone_mode = (mode == "zone")
+	paddle_pos = Vector2.ZERO
+	phone_vel = Vector2.ZERO
 	_serve()
+
+
+func to_menu() -> void:
+	state = "menu"
+	ball_stopped = false
+	_ash.clear()
+	_ring_gold = 0.0
 
 
 func _now() -> float:
@@ -263,8 +283,8 @@ func _process(delta: float) -> void:
 			_settle_timer -= delta
 			if _settle_timer <= 0.0:
 				_judge()
-		"dead":
-			pass  ## 等結算畫面的 play again
+		"dead", "menu":
+			pass  ## 等 HUD 的按鈕
 	queue_redraw()
 
 
@@ -472,6 +492,8 @@ func _draw() -> void:
 		draw_line(Vector2(0, y), Vector2(vp.x, y), gc, 1.0)
 		y += grid
 
+	if state == "menu":
+		return
 	if zone_mode:
 		_draw_zone(vp)
 
