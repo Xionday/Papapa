@@ -39,8 +39,8 @@ const PARAMS := [
 	["move zupt s", "move_zupt", 0.05, 0.5, 0.01],
 	["center strength", "center_strength", 0.0, 1.0, 0.05],
 	["bad launch x", "bad_launch", 0.3, 0.95, 0.05],
-	["full launch m/s", "full_launch", 3.0, 9.0, 0.1],
-	["lateral gain", "lateral_gain", 0.0, 400.0, 10.0],
+	["full launch m/s (this mode)", "full_launch", 3.0, 9.0, 0.1],
+	["lateral gain (this mode)", "lateral_gain", 0.0, 400.0, 10.0],
 	["show height m", "show_height", 0.2, 1.5, 0.05],
 ]
 

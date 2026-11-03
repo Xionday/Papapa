@@ -45,6 +45,11 @@ const ZONE_STAGES := [
 	[30, 1, 110.0, 250.0, 500.0],
 	[50, 1, 80.0, 300.0, 600.0],
 ]
+## 光圈模式的物理：彈得更高（有時間瞄）、傾斜飄得更少（不會一下跑太遠）
+@export var zone_launch: float = 7.2        ## m/s，滯空約 1.5 秒（endless 是 5.9 ≈ 1.2 秒）
+@export var zone_lateral_gain: float = 60.0 ## endless 是 150
+@export var endless_launch: float = 5.9
+@export var endless_lateral_gain: float = 150.0
 @export var zone_scale: float = 1.0         ## 全部半徑的倍率（tune 用）
 @export var zone_dist_scale: float = 1.0    ## 全部距離的倍率（tune 用）
 
@@ -125,6 +130,12 @@ func _ready() -> void:
 ## 從選單開始：mode = "endless" | "zone"
 func start_game(mode: String) -> void:
 	zone_mode = (mode == "zone")
+	if zone_mode:
+		full_launch = zone_launch
+		lateral_gain = zone_lateral_gain
+	else:
+		full_launch = endless_launch
+		lateral_gain = endless_lateral_gain
 	paddle_pos = Vector2.ZERO
 	phone_vel = Vector2.ZERO
 	_serve()
