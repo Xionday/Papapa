@@ -9,13 +9,15 @@ signal stopped(streak: int)   ## 連續兩次沒用力，球停在拍面上
 signal pushed(dir: Vector2)
 
 ## ---- 可調參數（HUD 的滑桿會改這些）----
-@export var hit_threshold: float = 2.0      ## m/s²，接球瞬間附近要有這麼大的向上加速度才算「有用力」（靜止噪音約 0.8）
+@export var hit_threshold: float = 1.25     ## m/s²，接球瞬間附近要有這麼大的向上加速度才算「有用力」（靜止噪音約 0.8）
 @export var hit_window: float = 0.25        ## s，往回看多久
-@export var push_enabled: bool = false      ## 推動暫時關閉：球先限制在螢幕內
-@export var push_threshold: float = 3.0     ## m/s²，水平加速度超過就算「推一下」
+## 手機位移（衝量版）：水平加速度積分成速度、再強力阻尼，位移 = 速度 × px_per_m
+@export var move_enabled: bool = true
+@export var move_deadzone: float = 0.6      ## m/s²，低於這個的水平加速度視為噪音
+@export var move_damping: float = 5.0       ## 1/s，速度衰減；越大「推一下」越短促
+@export var px_per_m: float = 1500.0        ## 手機移 10 cm ≈ 畫面移 150 px
+@export var center_strength: float = 0.8    ## 每次拍起，球在飛行中回到螢幕中心的比例（0 = 不回中）
 @export var edge_margin: float = 40.0       ## px，球離螢幕邊緣最少保留
-@export var push_distance: float = 300.0    ## px，推一下球拍在世界裡移動多遠
-@export var push_cooldown: float = 0.35     ## s
 @export var decay: float = 0.6              ## 第一次沒用力：下一次起跳速度 = 上次 × decay
 @export var max_weak: int = 2               ## 連續幾次沒用力，球就停在拍面上
 @export var full_launch: float = 5.9        ## m/s，用力時的起跳速度（約 1.2 秒滯空）
@@ -30,14 +32,13 @@ var v_up: float = 0.0                       ## m/s
 var v_lat: Vector2 = Vector2.ZERO           ## px/s
 var last_launch: float = 0.0
 var paddle_pos: Vector2 = Vector2.ZERO      ## 球拍（螢幕中心）在世界裡的位置
-var _paddle_target: Vector2 = Vector2.ZERO
+var phone_vel: Vector2 = Vector2.ZERO       ## 估計的手機水平速度 m/s（螢幕座標）
 var streak: int = 0
 var best: int = 0
 var weak_count: int = 0                     ## 連續弱擊次數，強擊歸零
 var ball_stopped: bool = false              ## 球停在拍面上（dead 期間仍畫出球）
 var state: String = "serve"                 ## serve | air | dead
 var _dead_timer: float = 0.0
-var _push_timer: float = 0.0
 var _flash: float = 0.0
 var _flash_color: Color = Color.WHITE
 
@@ -98,9 +99,8 @@ func _serve() -> void:
 
 
 func _process(delta: float) -> void:
-	_push_timer = max(0.0, _push_timer - delta)
 	_flash = max(0.0, _flash - delta * 3.0)
-	paddle_pos = paddle_pos.lerp(_paddle_target, 1.0 - exp(-12.0 * delta))
+	_step_move(delta)
 
 	match state:
 		"air":
@@ -112,18 +112,28 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
+## 手機位移：不是真的追蹤位置，是把「推一下」的衝量變成短暫的速度
+func _step_move(delta: float) -> void:
+	if not move_enabled:
+		return
+	var a := horiz_accel
+	if a.length() < move_deadzone:
+		a = Vector2.ZERO
+	phone_vel += a * delta
+	phone_vel *= exp(-move_damping * delta)
+	if phone_vel.length() < 0.005:
+		phone_vel = Vector2.ZERO
+	var step := phone_vel * px_per_m * delta
+	if step != Vector2.ZERO:
+		paddle_pos += step
+		pushed.emit(step)
+
+
 func _step_air(delta: float) -> void:
 	ball_h += v_up * delta
 	v_up -= gravity_m * delta
 	ball_pos += v_lat * delta
 	_clamp_to_screen()
-
-	## 推一下：球在空中、水平加速度夠大、冷卻結束
-	if push_enabled and ball_h > 0.15 and _push_timer <= 0.0 and horiz_accel.length() >= push_threshold:
-		var dir := horiz_accel.normalized()
-		_paddle_target += dir * push_distance
-		_push_timer = push_cooldown
-		pushed.emit(dir)
 
 	if ball_h <= 0.0 and v_up < 0.0:
 		ball_h = 0.0
@@ -151,6 +161,9 @@ func _step_air(delta: float) -> void:
 				last_launch = last_launch * decay
 			v_up = last_launch
 			v_lat = tilt * lateral_gain
+			## 回中：這次飛行結束時，球要回到螢幕中心 center_strength 的距離
+			var flight_t: float = 2.0 * v_up / gravity_m
+			v_lat += (paddle_pos - ball_pos) * center_strength / flight_t
 			streak += 1
 			best = max(best, streak)
 			_flash = 1.0

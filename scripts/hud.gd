@@ -15,8 +15,10 @@ extends CanvasLayer
 const PARAMS := [
 	["hit threshold m/s²", "hit_threshold", 0.5, 10.0, 0.25],
 	["hit window s", "hit_window", 0.05, 0.5, 0.01],
-	["push threshold m/s²", "push_threshold", 1.0, 10.0, 0.5],
-	["push distance px", "push_distance", 100.0, 600.0, 10.0],
+	["move px per m", "px_per_m", 0.0, 4000.0, 100.0],
+	["move damping", "move_damping", 1.0, 12.0, 0.5],
+	["move deadzone m/s²", "move_deadzone", 0.0, 2.0, 0.1],
+	["center strength", "center_strength", 0.0, 1.0, 0.05],
 	["decay (1st weak)", "decay", 0.3, 0.95, 0.05],
 	["full launch m/s", "full_launch", 3.0, 9.0, 0.1],
 	["lateral gain", "lateral_gain", 0.0, 400.0, 10.0],
@@ -26,6 +28,7 @@ const PARAMS := [
 var _value_labels: Dictionary = {}
 var _msg_timer: float = 0.0
 var _last_event: String = ""
+var _last_move: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
@@ -87,8 +90,8 @@ func _on_missed(streak: int) -> void:
 	_show_msg("missed  (%d)" % streak)
 
 
-func _on_pushed(dir: Vector2) -> void:
-	_last_event = "PUSH (%+.1f, %+.1f)" % [dir.x, dir.y]
+func _on_pushed(step: Vector2) -> void:
+	_last_move = step
 
 
 func _show_msg(t: String) -> void:
@@ -105,5 +108,6 @@ func _process(delta: float) -> void:
 		"sensor %s  %d Hz  fps %d  haptic %s" % [_sensor.status, _sensor.hz, Engine.get_frames_per_second(), _sensor.haptic_mode],
 		"up accel %+5.1f   horiz %4.1f" % [_game.up_accel, _game.horiz_accel.length()],
 		"tilt x %+4.1f y %+4.1f   height %.2f m" % [_game.tilt.x, _game.tilt.y, _game.ball_h],
+		"phone vel %+.2f %+.2f m/s   paddle %+.0f %+.0f" % [_game.phone_vel.x, _game.phone_vel.y, _game.paddle_pos.x, _game.paddle_pos.y],
 		_last_event,
 	])
