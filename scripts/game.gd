@@ -260,15 +260,16 @@ func _judge() -> void:
 
 ## PERFECT：環變金色，碎成灰燼飄散
 func _spawn_ash() -> void:
+	## 金環與灰燼用螢幕座標，固定在畫面上，不跟著手機位移
 	_ring_gold = 0.5
-	_ring_gold_pos = ball_pos
+	_ring_gold_pos = _to_screen(ball_pos)
 	_ash.clear()
 	var n := 36
 	for i in n:
 		var a: float = TAU * i / n + randf_range(-0.05, 0.05)
 		var dir := Vector2(cos(a), sin(a))
 		_ash.append({
-			"p": ball_pos + dir * BALL_R_LAND,
+			"p": _ring_gold_pos + dir * BALL_R_LAND,
 			"v": dir * randf_range(40.0, 120.0) + Vector2(randf_range(-20.0, 20.0), randf_range(-90.0, -40.0)),
 			"life": randf_range(0.5, 0.9),
 			"max": 0.0,
@@ -353,12 +354,12 @@ func _draw() -> void:
 
 	## PERFECT 的金環殘影與灰燼
 	if _ring_gold > 0.0:
-		var gp := _to_screen(_ring_gold_pos)
+		var gp := _ring_gold_pos
 		var f: float = _ring_gold / 0.5
 		draw_arc(gp, BALL_R_LAND + (1.0 - f) * 30.0, 0.0, TAU, 64, Color(1.0, 0.84, 0.3, 0.8 * f), 3.0)
 	for d in _ash:
 		var f2: float = d["life"] / d["max"]
-		draw_circle(_to_screen(d["p"]), d["r"] * f2, Color(1.0, 0.8, 0.3, 0.9 * f2))
+		draw_circle(d["p"], d["r"] * f2, Color(1.0, 0.8, 0.3, 0.9 * f2))
 
 	## 球：只有低於 show_height 才看得到，越高(越靠近眼睛)越大
 	if visible_ball:
