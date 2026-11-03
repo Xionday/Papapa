@@ -26,7 +26,8 @@ signal pushed(step: Vector2)
 @export var move_zupt: float = 0.15         ## s，連續安靜這麼久就把速度歸零（zero-velocity update）
 @export var px_per_m: float = 2500.0        ## 手機移 10 cm ≈ 畫面移 250 px
 @export var center_strength: float = 0.0    ## 每次拍起，球在飛行中回到螢幕中心的比例（0 = 不回中）
-@export var edge_margin: float = 40.0       ## px，球離螢幕邊緣最少保留
+@export var edge_margin: float = 40.0       ## px，球離螢幕邊緣最少保留（endless 模式）
+@export var clamp_in_zone_mode: bool = false ## 光圈模式不鎖邊界：球釘在世界裡，鏡頭怎麼移都不會被推著走
 @export var good_launch: float = 0.9        ## GOOD 的起跳速度倍率
 @export var bad_launch: float = 0.6         ## BAD / MISS 的起跳速度倍率
 @export var max_bad: int = 2                ## 連續幾次 BAD，球就停住
@@ -498,6 +499,8 @@ func _step_ash(delta: float) -> void:
 
 ## 球限制在螢幕內：撞到邊就停在邊上，橫向速度歸零
 func _clamp_to_screen() -> void:
+	if zone_mode and not clamp_in_zone_mode:
+		return
 	var half := get_viewport_rect().size * 0.5 - Vector2(edge_margin, edge_margin)
 	var d := ball_pos - paddle_pos
 	var c := Vector2(clamp(d.x, -half.x, half.x), clamp(d.y, -half.y, half.y))
@@ -574,6 +577,10 @@ func _draw() -> void:
 		var f2: float = d["life"] / d["max"]
 		draw_circle(d["p"], d["r"] * f2, Color(1.0, 0.8, 0.3, 0.9 * f2))
 
+	## 球的落點在畫面外：邊緣箭頭指向它
+	if sp.x < 0.0 or sp.x > vp.x or sp.y < 0.0 or sp.y > vp.y:
+		_draw_edge_arrow(vp, sp, Color(0.94, 0.6, 0.48))
+
 	## 球：只有低於 show_height 才看得到，越高(越靠近眼睛)越大
 	if visible_ball:
 		draw_circle(sp, ball_r, Color(0.94, 0.6, 0.48))
@@ -600,3 +607,18 @@ func _draw_zone(vp: Vector2) -> void:
 	## 剩幾次換位置：圈下方小點
 	for i in zone_left:
 		draw_circle(zp + Vector2(-14.0 * (zone_left - 1) + 28.0 * i, r + 22.0), 5.0, Color(ZONE_COL, 0.9))
+
+
+## 畫面邊緣的箭頭，指向畫面外的某個螢幕座標
+func _draw_edge_arrow(vp: Vector2, target: Vector2, col: Color) -> void:
+	var c := vp * 0.5
+	var dir := (target - c).normalized()
+	var margin := 36.0
+	var half := c - Vector2(margin, margin)
+	var tx: float = half.x / max(abs(dir.x), 0.0001)
+	var ty: float = half.y / max(abs(dir.y), 0.0001)
+	var ep: Vector2 = c + dir * min(tx, ty)
+	var perp := Vector2(-dir.y, dir.x)
+	var tri := PackedVector2Array([ep + dir * 24.0, ep - dir * 10.0 + perp * 18.0, ep - dir * 10.0 - perp * 18.0])
+	draw_colored_polygon(tri, col)
+	draw_circle(ep - dir * 30.0, 8.0, Color(col, 0.6))
