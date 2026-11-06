@@ -9,17 +9,17 @@
 
 [sub_resource type="ShaderMaterial" id="frost_menu"]
 shader = ExtResource("6_frost")
-shader_parameter/blur_lod = 3.2
-shader_parameter/tint_strength = 0.3
+shader_parameter/radius_px = 14.0
+shader_parameter/tint_strength = 0.18
 shader_parameter/tint = Color(0.12, 0.1, 0.1, 1)
-shader_parameter/frost = 0.1
+shader_parameter/frost = 0.06
 
 [sub_resource type="ShaderMaterial" id="frost_results"]
 shader = ExtResource("6_frost")
-shader_parameter/blur_lod = 3.4
-shader_parameter/tint_strength = 0.45
+shader_parameter/radius_px = 16.0
+shader_parameter/tint_strength = 0.35
 shader_parameter/tint = Color(0.1, 0.07, 0.07, 1)
-shader_parameter/frost = 0.08
+shader_parameter/frost = 0.05
 
 [sub_resource type="StyleBoxFlat" id="btn_primary"]
 content_margin_left = 24.0

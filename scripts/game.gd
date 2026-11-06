@@ -916,14 +916,7 @@ func _laser_seg(a: Vector2, b: Vector2, alpha: float, k: float) -> void:
 	draw_line(a, b, Color(1.0, 1.0, 0.96, alpha), 3.0)
 
 
-## 判定環：深色暈底 + 亮核心，紅底黑底都看得見；u = 收縮進度(0 遠 1 落地)，越近刻度越明顯
-func _draw_ring(c: Vector2, r: float, col: Color, u: float) -> void:
-	draw_arc(c, r, 0.0, TAU, 96, Color(0, 0, 0, 0.35), 9.0)
-	draw_arc(c, r, 0.0, TAU, 96, col, 3.0)
-	## 四個方向的短刻度，指向中心，讓「快到了」更清楚
-	var tick: float = 10.0 + 10.0 * u
-	for i in 4:
-		var a: float = TAU * i / 4.0
-		var d := Vector2(cos(a), sin(a))
-		draw_line(c + d * (r + 4.0), c + d * (r + 4.0 + tick), Color(0, 0, 0, 0.35), 6.0)
-		draw_line(c + d * (r + 4.0), c + d * (r + 4.0 + tick), col, 2.5)
+## 判定環：原本的白線加粗，底下墊一圈很淡的暗邊讓紅底也看得清
+func _draw_ring(c: Vector2, r: float, col: Color, _u: float) -> void:
+	draw_arc(c, r, 0.0, TAU, 96, Color(0, 0, 0, 0.18), 11.0)
+	draw_arc(c, r, 0.0, TAU, 96, col, 6.0)
