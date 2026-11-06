@@ -19,7 +19,7 @@ signal pushed(step: Vector2)
 @export var perfect_dt: float = 0.05        ## s，|揮擊 − 落地| 在這之內 = PERFECT
 @export var good_dt: float = 0.12           ## s，在這之內 = GOOD；再外面 = BAD
 ## 手機位移（衝量版）：水平加速度積分成速度、再強力阻尼，位移 = 速度 × px_per_m
-@export var move_enabled: bool = true
+@export var move_enabled: bool = false     ## 手機位移暫時關閉，先測傾斜彈跳
 @export var move_deadzone: float = 0.7      ## m/s²，低於這個的水平加速度視為手持雜訊（靜止時不起步）
 @export var move_damping: float = 0.0       ## 1/s，速度衰減（0 = 純積分，靠 ZUPT 歸零）
 @export var move_lowpass: float = 0.05      ## s，加速度低通時間常數
@@ -28,6 +28,7 @@ signal pushed(step: Vector2)
 @export var screen_width_cm: float = 7.0    ## 螢幕實體寬度（iPhone 約 6.5–7.2），start_game 時用它算 px_per_m
 @export var center_strength: float = 0.0    ## 每次拍起，球在飛行中回到螢幕中心的比例（0 = 不回中）
 @export var edge_margin: float = 40.0       ## px，球離螢幕邊緣最少保留（endless 模式）
+@export var wall_bounce: float = 0.6        ## 撞牆回彈係數：0 = 停住，1 = 全反彈
 @export var clamp_in_zone_mode: bool = false ## 光圈模式不鎖邊界：球釘在世界裡，鏡頭怎麼移都不會被推著走
 @export var good_launch: float = 0.9        ## GOOD 的起跳速度倍率
 @export var bad_launch: float = 0.6         ## BAD / MISS 的起跳速度倍率
@@ -97,6 +98,8 @@ var _zone_old_r: float = 0.0
 var _zone_fade: float = 0.0                 ## 舊圈淡出剩餘時間
 var _zone_grow: float = 0.0                 ## 新圈放大剩餘時間
 var _zone_hit_flash: float = 0.0
+var _wall_flash: float = 0.0
+var _wall_pos: Vector2 = Vector2.ZERO
 var fell_outside: bool = false              ## 這局是因為落在圈外結束
 var _ring_gold: float = 0.0                 ## PERFECT 後金環剩餘時間
 var _ring_gold_total: float = 0.5           ## 金環總時長 = 這次彈起到最高點的時間
@@ -307,6 +310,7 @@ func _process(delta: float) -> void:
 	_zone_fade = max(0.0, _zone_fade - delta)
 	_zone_grow = max(0.0, _zone_grow - delta)
 	_zone_hit_flash = max(0.0, _zone_hit_flash - delta)
+	_wall_flash = max(0.0, _wall_flash - delta)
 	_step_move(delta)
 	_step_ash(delta)
 
@@ -516,11 +520,18 @@ func _clamp_to_screen() -> void:
 	var half := get_viewport_rect().size * 0.5 - Vector2(edge_margin, edge_margin)
 	var d := ball_pos - paddle_pos
 	var c := Vector2(clamp(d.x, -half.x, half.x), clamp(d.y, -half.y, half.y))
+	var hit_wall := false
 	if c.x != d.x:
-		v_lat.x = 0.0
+		v_lat.x = -v_lat.x * wall_bounce
+		hit_wall = true
 	if c.y != d.y:
-		v_lat.y = 0.0
+		v_lat.y = -v_lat.y * wall_bounce
+		hit_wall = true
 	ball_pos = paddle_pos + c
+	if hit_wall and v_lat.length() > 20.0:
+		_wall_flash = 0.2
+		_wall_pos = _to_screen(ball_pos)
+		_sfx.play("wall")
 
 
 ## ---- 畫面 ----
@@ -553,6 +564,19 @@ func _draw() -> void:
 
 	if state == "menu":
 		return
+	## 撞牆閃光：在撞到的那一側畫一條亮邊
+	if _wall_flash > 0.0:
+		var f: float = _wall_flash / 0.2
+		var wc := Color(1, 1, 1, 0.5 * f)
+		var m := edge_margin
+		if _wall_pos.x <= m + 1.0:
+			draw_rect(Rect2(0, 0, m, vp.y), wc)
+		elif _wall_pos.x >= vp.x - m - 1.0:
+			draw_rect(Rect2(vp.x - m, 0, m, vp.y), wc)
+		if _wall_pos.y <= m + 1.0:
+			draw_rect(Rect2(0, 0, vp.x, m), wc)
+		elif _wall_pos.y >= vp.y - m - 1.0:
+			draw_rect(Rect2(0, vp.y - m, vp.x, m), wc)
 	if zone_mode:
 		_draw_zone(vp)
 

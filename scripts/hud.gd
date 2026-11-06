@@ -23,6 +23,7 @@ extends CanvasLayer
 @onready var _show_switch: Button = $Panel/VBox/Tests/ShowSwitch
 @onready var _test_sound: Button = $Panel/VBox/Tests/TestSound
 @onready var _zone_btn: Button = $Panel/VBox/Tests/ZoneToggle
+@onready var _move_btn: Button = $Panel/VBox/Tests/MoveToggle
 
 ## name, property, min, max, step
 const PARAMS := [
@@ -42,6 +43,7 @@ const PARAMS := [
 	["bad launch x", "bad_launch", 0.3, 0.95, 0.05],
 	["full launch m/s (this mode)", "full_launch", 3.0, 9.0, 0.1],
 	["lateral gain (this mode)", "lateral_gain", 0.0, 400.0, 10.0],
+	["wall bounce", "wall_bounce", 0.0, 1.0, 0.05],
 	["show height m", "show_height", 0.2, 1.5, 0.05],
 ]
 
@@ -89,6 +91,10 @@ func _ready() -> void:
 	_show_switch.pressed.connect(func():
 		_sensor.show_haptic_switch()
 		_show_msg("tap the switch at bottom-left"))
+	_move_btn.text = "move: on" if _game.move_enabled else "move: off"
+	_move_btn.pressed.connect(func():
+		_game.move_enabled = not _game.move_enabled
+		_move_btn.text = "move: on" if _game.move_enabled else "move: off")
 	_zone_btn.text = "zone: on" if _game.zone_mode else "zone: off"
 	_zone_btn.pressed.connect(func():
 		_game.zone_mode = not _game.zone_mode

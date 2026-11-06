@@ -17,6 +17,7 @@ func _ready() -> void:
 	_streams["miss"] = _tone([160.0], 0.2, 0.4, "square")
 	_streams["stop"] = _tone([140.0, 100.0], 0.4, 0.5, "square")
 	_streams["tick"] = _tone([1200.0], 0.03, 0.25, "sine")
+	_streams["wall"] = _tone([300.0], 0.06, 0.3, "square")
 	_streams["zone"] = _tone([523.0, 784.0, 1047.0], 0.22, 0.4, "sine")
 	for i in 6:
 		var p := AudioStreamPlayer.new()
