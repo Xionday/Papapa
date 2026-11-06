@@ -17,14 +17,15 @@ extends CanvasLayer
 @onready var _menu_btn: Button = $Results/VBox/Menu
 @onready var _menu: Control = $Menu
 @onready var _dev_toggle: CheckButton = $Menu/VBox/DevRow/Dev
+@onready var _menu_best: Label = $Menu/VBox/BestRow
 var dev_mode: bool = false
 @onready var _endless_btn: Button = $Menu/VBox/Endless
 @onready var _zone_mode_btn: Button = $Menu/VBox/Zone
-@onready var _rubber_red: Button = $Menu/VBox/Rubber/Red
-@onready var _rubber_black: Button = $Menu/VBox/Rubber/Black
-@onready var _rubber_alt: Button = $Menu/VBox/Rubber/Alt
-@onready var _ball_yellow: Button = $Menu/VBox/Ball/Yellow
-@onready var _ball_white: Button = $Menu/VBox/Ball/White
+@onready var _rubber_red: Button = $Menu/VBox/Card/CardV/Rubber/Red
+@onready var _rubber_black: Button = $Menu/VBox/Card/CardV/Rubber/Black
+@onready var _rubber_alt: Button = $Menu/VBox/Card/CardV/Rubber/Alt
+@onready var _ball_yellow: Button = $Menu/VBox/Card/CardV/Ball/Yellow
+@onready var _ball_white: Button = $Menu/VBox/Card/CardV/Ball/White
 @onready var _r_reason: Label = $Results/VBox/Reason
 @onready var _r_count: Label = $Results/VBox/Count
 @onready var _r_best: Label = $Results/VBox/Best
@@ -226,6 +227,8 @@ func _process(delta: float) -> void:
 	_combo.text = "combo %d   (best %d)" % [_game.streak, _game.best_streak]
 	_score.text = "%d" % _game.score
 	_game.counter_visible = not _menu.visible and not _results.visible
+	if _menu.visible:
+		_menu_best.text = "BEST %d" % _game.best_streak
 	_debug.text = "\n".join([
 		"sensor %s  %d Hz  fps %d  haptic %s" % [_sensor.status, _sensor.hz, Engine.get_frames_per_second(), _sensor.haptic_mode],
 		"up accel %+5.1f   horiz %4.1f   h %.2f m   zone %d left %d" % [_game.up_accel, _game.horiz_accel.length(), _game.ball_h, _game.zone_index, _game.zone_left],

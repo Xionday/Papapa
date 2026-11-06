@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
 [ext_resource type="Script" path="res://scripts/sensor_bridge.gd" id="2_sensor"]
@@ -6,6 +6,22 @@
 [ext_resource type="Script" path="res://scripts/sfx.gd" id="4_sfx"]
 [ext_resource type="Script" path="res://scripts/paddle_icon.gd" id="5_icon"]
 [ext_resource type="Shader" path="res://shaders/frosted.gdshader" id="6_frost"]
+[ext_resource type="Script" path="res://scripts/logo_mark.gd" id="7_logo"]
+
+[sub_resource type="StyleBoxLine" id="sep_line"]
+color = Color(1, 1, 1, 0.12)
+thickness = 2
+
+[sub_resource type="StyleBoxFlat" id="card_bg"]
+content_margin_left = 20.0
+content_margin_top = 16.0
+content_margin_right = 20.0
+content_margin_bottom = 16.0
+bg_color = Color(0, 0, 0, 0.18)
+corner_radius_top_left = 24
+corner_radius_top_right = 24
+corner_radius_bottom_right = 24
+corner_radius_bottom_left = 24
 
 [sub_resource type="ShaderMaterial" id="frost_menu"]
 shader = ExtResource("6_frost")
@@ -400,55 +416,78 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 48.0
-offset_top = 140.0
-offset_right = -48.0
-offset_bottom = -80.0
+offset_left = 44.0
+offset_top = 120.0
+offset_right = -44.0
+offset_bottom = -60.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 20
+theme_override_constants/separation = 16
 alignment = 1
 
 [node name="Spacer0" type="Control" parent="HUD/Menu/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
 
+[node name="LogoRow" type="CenterContainer" parent="HUD/Menu/VBox"]
+layout_mode = 2
+
+[node name="Logo" type="Control" parent="HUD/Menu/VBox/LogoRow"]
+custom_minimum_size = Vector2(200, 200)
+layout_mode = 2
+script = ExtResource("7_logo")
+
 [node name="Title" type="Label" parent="HUD/Menu/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.95, 0.85, 1)
-theme_override_font_sizes/font_size = 120
-text = "PAPAPA"
+theme_override_font_sizes/font_size = 80
+text = "PinLinPanLan"
 horizontal_alignment = 1
 
 [node name="Sub" type="Label" parent="HUD/Menu/VBox"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 0.55)
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 24
 text = "hold flat  ·  swing up  ·  keep it going"
+horizontal_alignment = 1
+
+[node name="BestRow" type="Label" parent="HUD/Menu/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.87, 0.2, 1)
+theme_override_font_sizes/font_size = 28
+text = "BEST 0"
 horizontal_alignment = 1
 
 [node name="Spacer1" type="Control" parent="HUD/Menu/VBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 12)
 
-[node name="RubberLabel" type="Label" parent="HUD/Menu/VBox"]
+[node name="Card" type="PanelContainer" parent="HUD/Menu/VBox"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("card_bg")
+
+[node name="CardV" type="VBoxContainer" parent="HUD/Menu/VBox/Card"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="RubberLabel" type="Label" parent="HUD/Menu/VBox/Card/CardV"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 0.5)
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 20
 text = "PADDLE"
 horizontal_alignment = 1
 
-[node name="Rubber" type="HBoxContainer" parent="HUD/Menu/VBox"]
+[node name="Rubber" type="HBoxContainer" parent="HUD/Menu/VBox/Card/CardV"]
 layout_mode = 2
-theme_override_constants/separation = 24
+theme_override_constants/separation = 16
 alignment = 1
 
-[node name="Red" type="Button" parent="HUD/Menu/VBox/Rubber"]
+[node name="Red" type="Button" parent="HUD/Menu/VBox/Card/CardV/Rubber"]
 layout_mode = 2
-custom_minimum_size = Vector2(150, 170)
+custom_minimum_size = Vector2(140, 150)
 flat = true
 
-[node name="Icon" type="Control" parent="HUD/Menu/VBox/Rubber/Red"]
+[node name="Icon" type="Control" parent="HUD/Menu/VBox/Card/CardV/Rubber/Red"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -457,12 +496,12 @@ mouse_filter = 2
 script = ExtResource("5_icon")
 mode = "red"
 
-[node name="Black" type="Button" parent="HUD/Menu/VBox/Rubber"]
+[node name="Black" type="Button" parent="HUD/Menu/VBox/Card/CardV/Rubber"]
 layout_mode = 2
-custom_minimum_size = Vector2(150, 170)
+custom_minimum_size = Vector2(140, 150)
 flat = true
 
-[node name="Icon" type="Control" parent="HUD/Menu/VBox/Rubber/Black"]
+[node name="Icon" type="Control" parent="HUD/Menu/VBox/Card/CardV/Rubber/Black"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -471,12 +510,12 @@ mouse_filter = 2
 script = ExtResource("5_icon")
 mode = "black"
 
-[node name="Alt" type="Button" parent="HUD/Menu/VBox/Rubber"]
+[node name="Alt" type="Button" parent="HUD/Menu/VBox/Card/CardV/Rubber"]
 layout_mode = 2
-custom_minimum_size = Vector2(150, 170)
+custom_minimum_size = Vector2(140, 150)
 flat = true
 
-[node name="Icon" type="Control" parent="HUD/Menu/VBox/Rubber/Alt"]
+[node name="Icon" type="Control" parent="HUD/Menu/VBox/Card/CardV/Rubber/Alt"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -485,24 +524,29 @@ mouse_filter = 2
 script = ExtResource("5_icon")
 mode = "alternate"
 
-[node name="BallLabel" type="Label" parent="HUD/Menu/VBox"]
+[node name="Sep" type="HSeparator" parent="HUD/Menu/VBox/Card/CardV"]
+layout_mode = 2
+theme_override_constants/separation = 12
+theme_override_styles/separator = SubResource("sep_line")
+
+[node name="BallLabel" type="Label" parent="HUD/Menu/VBox/Card/CardV"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 0.5)
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 20
 text = "BALL"
 horizontal_alignment = 1
 
-[node name="Ball" type="HBoxContainer" parent="HUD/Menu/VBox"]
+[node name="Ball" type="HBoxContainer" parent="HUD/Menu/VBox/Card/CardV"]
 layout_mode = 2
 theme_override_constants/separation = 32
 alignment = 1
 
-[node name="Yellow" type="Button" parent="HUD/Menu/VBox/Ball"]
+[node name="Yellow" type="Button" parent="HUD/Menu/VBox/Card/CardV/Ball"]
 layout_mode = 2
-custom_minimum_size = Vector2(110, 110)
+custom_minimum_size = Vector2(96, 96)
 flat = true
 
-[node name="Icon" type="Control" parent="HUD/Menu/VBox/Ball/Yellow"]
+[node name="Icon" type="Control" parent="HUD/Menu/VBox/Card/CardV/Ball/Yellow"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -511,12 +555,12 @@ mouse_filter = 2
 script = ExtResource("5_icon")
 mode = "ball_yellow"
 
-[node name="White" type="Button" parent="HUD/Menu/VBox/Ball"]
+[node name="White" type="Button" parent="HUD/Menu/VBox/Card/CardV/Ball"]
 layout_mode = 2
-custom_minimum_size = Vector2(110, 110)
+custom_minimum_size = Vector2(96, 96)
 flat = true
 
-[node name="Icon" type="Control" parent="HUD/Menu/VBox/Ball/White"]
+[node name="Icon" type="Control" parent="HUD/Menu/VBox/Card/CardV/Ball/White"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -527,7 +571,7 @@ mode = "ball_white"
 
 [node name="Spacer2" type="Control" parent="HUD/Menu/VBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 16)
+custom_minimum_size = Vector2(0, 8)
 
 [node name="Endless" type="Button" parent="HUD/Menu/VBox"]
 layout_mode = 2
@@ -544,9 +588,6 @@ text = "PLAY"
 [node name="Zone" type="Button" parent="HUD/Menu/VBox"]
 visible = false
 layout_mode = 2
-custom_minimum_size = Vector2(0, 80)
-theme_override_font_sizes/font_size = 30
-theme_override_styles/normal = SubResource("btn_ghost")
 text = "zone (wip)"
 
 [node name="Spacer3" type="Control" parent="HUD/Menu/VBox"]
