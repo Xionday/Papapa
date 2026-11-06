@@ -183,7 +183,7 @@ func _fmt(v: float) -> String:
 
 
 func _on_judged(grade: String, dt: float, streak: int, score: int) -> void:
-	_judge.text = "TOO SHAKY" if _game.last_flail else grade.to_upper()
+	_judge.text = grade.to_upper()
 	_judge.add_theme_color_override("font_color", GRADE_COLOR[grade])
 	_judge_timer = 0.7
 	_last_event = "%s  gap %.0f px  dt %+.0f ms  peak %.1f  swings %d" % [grade, _game.last_gap, dt * 1000.0, _game.last_peak, _game.last_swings]

@@ -765,10 +765,11 @@ func _draw() -> void:
 	var now := _now()
 	if state == "air" and now >= _t_apex:
 		var u: float = clamp((now - _t_apex) / max(0.01, _t_land_pred - _t_apex), 0.0, 1.0)
-		var ring_r: float = BALL_R_LAND + _ring_gap_at(now)
+		## 環 = 球「目前」的邊緣 + gap，所以永遠在球外面、落地時剛好貼住球
+		var ring_r: float = ball_r + _ring_gap_at(now)
 		_draw_ring(sp, ring_r, Color(1, 1, 1, 0.85), u)
 	elif state == "settle":
-		_draw_ring(sp, BALL_R_LAND, Color(1, 1, 1, 0.85), 1.0)
+		_draw_ring(sp, ball_r, Color(1, 1, 1, 0.85), 1.0)
 
 	## PERFECT 的金環殘影與灰燼
 	if _ring_gold > 0.0:
