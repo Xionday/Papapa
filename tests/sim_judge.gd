@@ -114,5 +114,26 @@ func _run() -> void:
 			_feed(6.0)
 		else:
 			_feed(0.0)
-	print("  整段亂晃 → %s   (應為 bad, swings %d)" % [game.round_log[-1]["grade"], game.last_swings])
+	print("  整段亂晃 → %s   (應為 miss 或 bad, swings %d)" % [game.round_log[-1]["grade"], game.last_swings])
+	## 真實揮擊波形：上(4幀) → 減速(4幀) → 靜(6幀) → 回彈小凸起(2幀, 2.5)。在 gap 300 起手 → 應為 bad，不能被回彈拉成 perfect
+	game.start_game("endless")
+	n0 = game.round_log.size()
+	frames = 0
+	var seq: Array = []
+	for i in 4: seq.append(6.0)
+	for i in 4: seq.append(-4.0)
+	for i in 6: seq.append(0.0)
+	for i in 2: seq.append(2.5)
+	var si := -1
+	while game.round_log.size() == n0 and frames < 400:
+		frames += 1
+		var falling: bool = game.state == "air" and game._now() >= game._t_apex
+		if si < 0 and falling and game._ring_gap_at(game._now()) <= 300.0:
+			si = 0
+		if si >= 0 and si < seq.size():
+			_feed(seq[si])
+			si += 1
+		else:
+			_feed(0.0)
+	print("  真實波形 gap300 起手(含回彈) → %s   (應為 bad, gap %.0f, swings %d)" % [game.round_log[-1]["grade"], game.last_gap, game.last_swings])
 	quit()

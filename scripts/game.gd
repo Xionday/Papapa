@@ -13,7 +13,8 @@ signal zone_changed(index: int)
 signal pushed(step: Vector2)
 
 ## ---- 可調參數（HUD 的滑桿會改這些）----
-@export var hit_threshold: float = 1.25     ## m/s²，向上加速度要超過這個才算有揮
+@export var hit_threshold: float = 2.0      ## m/s²，向上加速度要超過這個才算有揮
+@export var swing_merge: float = 0.22       ## s，兩段超過門檻的訊號間隔小於這個 = 同一次揮擊（揮完的回彈不另算）
 ## 判定環判定：揮擊那一刻「環的半徑 − 落地時球半徑」的距離(px)。環等速收縮，所以這等於時間，但跟玩家看到的一致。
 @export var judge_perfect_gap: float = 70.0   ## 環離球 ≤ 這個 → perfect（含落地後寬限）
 @export var judge_good_gap: float = 200.0     ## ≤ 這個 → good
@@ -245,38 +246,41 @@ func _height_at(t: float) -> float:
 	return 0.0
 
 
-## 在 [t0, t1] 之間，找「最後一次」向上加速度超過門檻的揮擊；回傳該次的峰值 (時刻, 值)；沒有 → (−1, 0)
+## 把 [t0, t1] 之間超過門檻的樣本分成「揮擊」：連續段，且兩段間隔 < swing_merge 視為同一次。
+## 回傳每次揮擊的 {onset, peak_t, peak}
+func _swings_between(t0: float, t1: float, threshold: float) -> Array:
+	var out: Array = []
+	var cur: Dictionary = {}
+	var last_above: float = -1.0
+	for sm in _up_hist:
+		if sm.x < t0 or sm.x > t1:
+			continue
+		if sm.y >= threshold:
+			if cur.is_empty() or (sm.x - last_above) > swing_merge:
+				if not cur.is_empty():
+					out.append(cur)
+				cur = {"onset": sm.x, "peak_t": sm.x, "peak": sm.y}
+			elif sm.y > cur["peak"]:
+				cur["peak"] = sm.y
+				cur["peak_t"] = sm.x
+			last_above = sm.x
+	if not cur.is_empty():
+		out.append(cur)
+	return out
+
+
+## 最後一次揮擊：以「起手」時刻為準（比峰值穩定：峰值會隨揮多用力而前後移）
 func _last_swing_between(t0: float, t1: float, threshold: float) -> Vector2:
-	var best := Vector2(-1.0, 0.0)
-	var in_swing := false
-	for sm in _up_hist:
-		if sm.x < t0 or sm.x > t1:
-			continue
-		if sm.y >= threshold:
-			if not in_swing:
-				in_swing = true
-				best = sm
-			elif sm.y > best.y:
-				best = sm
-		else:
-			in_swing = false
-	return best
+	var sw := _swings_between(t0, t1, threshold)
+	if sw.is_empty():
+		return Vector2(-1.0, 0.0)
+	var last: Dictionary = sw[-1]
+	return Vector2(last["onset"], last["peak"])
 
 
-## [t0, t1] 之間有幾次獨立的揮擊（超過門檻的連續段算一次）
+## [t0, t1] 之間有幾次獨立的揮擊（同一次揮擊的回彈不另算）
 func _count_swings_between(t0: float, t1: float, threshold: float) -> int:
-	var n := 0
-	var in_swing := false
-	for sm in _up_hist:
-		if sm.x < t0 or sm.x > t1:
-			continue
-		if sm.y >= threshold:
-			if not in_swing:
-				in_swing = true
-				n += 1
-		else:
-			in_swing = false
-	return n
+	return _swings_between(t0, t1, threshold).size()
 
 
 ## 在 [t0, t1] 之間找向上加速度最大的一筆，回傳 (時刻, 值)；沒有就 (−1, 0)
@@ -642,35 +646,47 @@ func _end_round(col: Color) -> void:
 
 ## PERFECT：環變金色，碎成灰燼飄散
 func _spawn_ash() -> void:
-	## 金環與灰燼用螢幕座標，固定在畫面上，不跟著手機位移
-	## 金環時長 = 到最高點的時間，半徑跟著影子一起放大
-	_ring_gold_total = max(0.2, last_launch / gravity_m)
+	## 金環與粒子用螢幕座標，固定在畫面上
+	_ring_gold_total = 1.1
 	_ring_gold = _ring_gold_total
 	_ring_gold_pos = _to_screen(ball_pos)
 	_ash.clear()
-	var n := 36
+	var n := 72
 	for i in n:
-		var a: float = TAU * i / n + randf_range(-0.05, 0.05)
-		var dir := Vector2(cos(a), sin(a))
+		var a: float = TAU * i / n
 		_ash.append({
-			"p": _ring_gold_pos + dir * BALL_R_LAND,
-			"v": dir * randf_range(40.0, 120.0) + Vector2(randf_range(-20.0, 20.0), randf_range(-90.0, -40.0)),
-			"life": randf_range(0.5, 0.9),
-			"max": 0.0,
-			"r": randf_range(2.0, 4.5),
+			"ang": a,
+			"p": _ring_gold_pos,
+			"v": Vector2.ZERO,
+			"detach": randf_range(0.30, 0.55),  ## 這顆粒子何時脫離環
+			"r": randf_range(2.5, 4.5),
+			"jit": randf_range(0.6, 1.4),
 		})
-	for d in _ash:
-		d["max"] = d["life"]
+
+
+## 金環半徑隨時間擴大（ease-out）
+func _gold_ring_r(t: float) -> float:
+	var u: float = clamp(t / 0.6, 0.0, 1.0)
+	u = 1.0 - (1.0 - u) * (1.0 - u)
+	return lerp(BALL_R_LAND + 12.0, 230.0, u)
 
 
 func _step_ash(delta: float) -> void:
 	if _ash.is_empty():
 		return
+	var t: float = _ring_gold_total - _ring_gold
+	var alive: Array = []
 	for d in _ash:
-		d["life"] -= delta
-		d["p"] += d["v"] * delta
-		d["v"] = d["v"] * exp(-1.5 * delta) + Vector2(randf_range(-30.0, 30.0), -25.0) * delta
-	_ash = _ash.filter(func(d): return d["life"] > 0.0)
+		var dir := Vector2(cos(d["ang"]), sin(d["ang"]))
+		if t < d["detach"]:
+			d["p"] = _ring_gold_pos + dir * _gold_ring_r(t)
+			d["v"] = dir * 90.0 + Vector2(0, -60.0)
+		else:
+			d["p"] += d["v"] * delta
+			d["v"] = d["v"] * exp(-1.2 * delta) + Vector2(randf_range(-40.0, 40.0) * d["jit"], -40.0) * delta
+		if t < d["detach"] + 0.6:
+			alive.append(d)
+	_ash = alive
 
 
 ## 球限制在螢幕內：撞到邊就停在邊上，橫向速度歸零
@@ -771,18 +787,27 @@ func _draw() -> void:
 	elif state == "settle":
 		_draw_ring(sp, ball_r, Color(1, 1, 1, 0.85), 1.0)
 
-	## PERFECT 的金環殘影與灰燼
+	## PERFECT：金環擴大、線逐漸變淡，環上的點脫離成光點飄散
 	if _ring_gold > 0.0:
 		var gp := _ring_gold_pos
-		var f: float = _ring_gold / _ring_gold_total
-		## 半徑跟著影子放大但更大一圈，位置固定在畫面上
-		var gr: float = shadow_r * 1.8 + 20.0
-		draw_arc(gp, gr, 0.0, TAU, 64, Color(0, 0, 0, 0.25 * f), 14.0)
-		draw_arc(gp, gr, 0.0, TAU, 64, Color(1.0, 0.84, 0.3, 0.95 * f), 7.0)
-		draw_arc(gp, gr, 0.0, TAU, 64, Color(1.0, 0.97, 0.8, 0.9 * f), 2.5)
-	for d in _ash:
-		var f2: float = d["life"] / d["max"]
-		draw_circle(d["p"], d["r"] * f2, Color(1.0, 0.8, 0.3, 0.9 * f2))
+		var gt: float = _ring_gold_total - _ring_gold
+		var gr: float = _gold_ring_r(gt)
+		var line_a: float = clamp(1.0 - gt / 0.45, 0.0, 1.0)
+		if line_a > 0.0:
+			draw_arc(gp, gr, 0.0, TAU, 72, Color(0, 0, 0, 0.2 * line_a), 12.0)
+			draw_arc(gp, gr, 0.0, TAU, 72, Color(1.0, 0.84, 0.3, 0.9 * line_a), 6.0)
+			draw_arc(gp, gr, 0.0, TAU, 72, Color(1.0, 0.97, 0.8, 0.9 * line_a), 2.0)
+		for d in _ash:
+			var age: float = gt - d["detach"]
+			var a: float
+			if age > 0.0:
+				a = clamp(1.0 - age / 0.6, 0.0, 1.0)
+			else:
+				a = clamp(1.0 - line_a, 0.0, 1.0)
+			if a <= 0.0:
+				continue
+			draw_circle(d["p"], d["r"] * (0.6 + 0.4 * a), Color(1.0, 0.86, 0.4, 0.95 * a))
+			draw_circle(d["p"], d["r"] * 0.45, Color(1.0, 0.98, 0.85, a))
 
 	## 球的落點在畫面外：邊緣箭頭指向它
 	if sp.x < 0.0 or sp.x > vp.x or sp.y < 0.0 or sp.y > vp.y:
