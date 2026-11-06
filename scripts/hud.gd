@@ -134,13 +134,7 @@ func _ready() -> void:
 	_zone_btn.text = "zone: on" if _game.zone_mode else "zone: off"
 	_zone_btn.pressed.connect(func():
 		_game.zone_mode = not _game.zone_mode
-		_lat_btn.pressed.connect(func():
-		_game.latency_test = not _game.latency_test
-		_game.latency_samples.clear()
-		_lat_btn.text = "latency: on" if _game.latency_test else "latency test"
-		if _game.latency_test:
-			_show_msg("tap the screen firmly 10 times"))
-	_zone_btn.text = "zone: on" if _game.zone_mode else "zone: off")
+		_zone_btn.text = "zone: on" if _game.zone_mode else "zone: off")
 	_test_sound.pressed.connect(func():
 		_game.get_node("Sfx").play("perfect")
 		_show_msg("sound: perfect"))
