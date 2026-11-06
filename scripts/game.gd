@@ -14,10 +14,10 @@ signal pushed(step: Vector2)
 
 ## ---- 可調參數（HUD 的滑桿會改這些）----
 @export var hit_threshold: float = 1.25     ## m/s²，向上加速度要超過這個才算有揮
-## 高度判定：揮擊那一刻球離地高度 / 這次最高點 的比例
-@export var judge_miss_above: float = 0.5   ## 高於這個 → 太早(當 miss，之後再揮以最後一次為準)
-@export var judge_bad_above: float = 0.22   ## 高於這個 → bad
-@export var judge_good_above: float = 0.08  ## 高於這個 → good；更低(含落地後寬限) → perfect
+## 判定環判定：揮擊那一刻「環的半徑 − 落地時球半徑」的距離(px)。環等速收縮，所以這等於時間，但跟玩家看到的一致。
+@export var judge_perfect_gap: float = 100.0  ## 環離球 ≤ 這個 → perfect（含落地後寬限）
+@export var judge_good_gap: float = 260.0     ## ≤ 這個 → good
+@export var judge_bad_gap: float = 460.0      ## ≤ 這個 → bad；更遠 → miss(太早；之後再揮以最後一次為準)
 @export var timing_bias: float = -0.05      ## (舊的時間判定用，保留給 dev 面板參考)       ## s，perfect 的中心點相對落地的偏移（負 = 允許提早揮）
 @export var grace_after: float = 0.08       ## s，落地後再等多久才結算（讓晚一點揮也算得到）
 @export var perfect_dt: float = 0.05        ## s，|揮擊 − 落地| 在這之內 = PERFECT
@@ -132,6 +132,7 @@ var last_grade: String = ""
 var last_dt: float = 0.0
 var last_peak: float = 0.0
 var last_h_ratio: float = -1.0              ## 最後一次揮擊時球高度/最高點（dev 用）
+var last_gap: float = -1.0                  ## 最後一次揮擊時環離球的距離 px（dev 用）
 var round_log: Array = []                   ## 這局每一次判定 {grade, dt, peak}
 
 ## 感測器
@@ -213,6 +214,17 @@ func _on_sample(linear: Vector3, gravity: Vector3) -> void:
 
 func calibrate_tilt() -> void:
 	tilt_zero += tilt
+
+
+## 收縮環的起始半徑（螢幕外）
+func _ring_start() -> float:
+	return get_viewport_rect().size.length() * 0.5 + 20.0
+
+
+## 某個時刻環離「落地時的球」多遠（px）；等速收縮所以是時間的線性函數
+func _ring_gap_at(t: float) -> float:
+	var u: float = clamp((t - _t_apex) / max(0.01, _t_land_pred - _t_apex), 0.0, 1.0)
+	return (1.0 - u) * (_ring_start() - BALL_R_LAND)
 
 
 ## 某個時刻球的高度（從歷史內插）
@@ -394,6 +406,7 @@ func _process(delta: float) -> void:
 	_step_ash(delta)
 
 	_step_idle(delta)
+	_step_latency()
 	match state:
 		"air":
 			if not debug_freeze:
@@ -518,24 +531,25 @@ func _judge() -> void:
 	last_peak = peak.y
 	var grade: String
 	last_h_ratio = -1.0
+	last_gap = -1.0
 	if peak.x < 0.0:
 		grade = "miss"
 		last_dt = 0.0
 	else:
 		last_dt = peak.x - _t_land
-		## 落地後(寬限內)揮 → 高度視為 0
-		var h: float = 0.0 if peak.x >= _t_land else _height_at(peak.x)
-		last_h_ratio = h / _apex_h
-		if last_h_ratio > judge_miss_above:
+		last_h_ratio = (0.0 if peak.x >= _t_land else _height_at(peak.x)) / _apex_h
+		## 揮擊那一刻環的半徑（和畫面上畫的同一條公式）；落地後 = 0
+		last_gap = 0.0 if peak.x >= _t_land else _ring_gap_at(peak.x)
+		if last_gap > judge_bad_gap:
 			grade = "miss"
-		elif last_h_ratio > judge_bad_above:
+		elif last_gap > judge_good_gap:
 			grade = "bad"
-		elif last_h_ratio > judge_good_above:
+		elif last_gap > judge_perfect_gap:
 			grade = "good"
 		else:
 			grade = "perfect"
 	last_grade = grade
-	round_log.append({"grade": grade, "dt": last_dt, "peak": last_peak, "h": last_h_ratio})
+	round_log.append({"grade": grade, "dt": last_dt, "peak": last_peak, "h": last_h_ratio, "gap": last_gap})
 
 	match grade:
 		"perfect":
@@ -725,9 +739,8 @@ func _draw() -> void:
 	## 收縮環：從最高點開始、由螢幕外等速縮進來，落地瞬間剛好貼住球與影子
 	var now := _now()
 	if state == "air" and now >= _t_apex:
-		var ring_start: float = vp.length() * 0.5 + 20.0
 		var u: float = clamp((now - _t_apex) / max(0.01, _t_land_pred - _t_apex), 0.0, 1.0)
-		var ring_r: float = lerp(ring_start, BALL_R_LAND, u)
+		var ring_r: float = BALL_R_LAND + _ring_gap_at(now)
 		_draw_ring(sp, ring_r, Color(1, 1, 1, 0.85), u)
 	elif state == "settle":
 		_draw_ring(sp, BALL_R_LAND, Color(1, 1, 1, 0.85), 1.0)
@@ -736,10 +749,11 @@ func _draw() -> void:
 	if _ring_gold > 0.0:
 		var gp := _ring_gold_pos
 		var f: float = _ring_gold / _ring_gold_total
-		## 半徑 = 此刻影子的半徑（球越高影子越大），位置固定在畫面上
-		draw_arc(gp, shadow_r, 0.0, TAU, 64, Color(0, 0, 0, 0.35 * f), 10.0)
-		draw_arc(gp, shadow_r, 0.0, TAU, 64, Color(1.0, 0.84, 0.3, 0.95 * f), 4.0)
-		draw_arc(gp, shadow_r, 0.0, TAU, 64, Color(1.0, 0.97, 0.8, 0.9 * f), 1.5)
+		## 半徑跟著影子放大但更大一圈，位置固定在畫面上
+		var gr: float = shadow_r * 1.8 + 20.0
+		draw_arc(gp, gr, 0.0, TAU, 64, Color(0, 0, 0, 0.25 * f), 14.0)
+		draw_arc(gp, gr, 0.0, TAU, 64, Color(1.0, 0.84, 0.3, 0.95 * f), 7.0)
+		draw_arc(gp, gr, 0.0, TAU, 64, Color(1.0, 0.97, 0.8, 0.9 * f), 2.5)
 	for d in _ash:
 		var f2: float = d["life"] / d["max"]
 		draw_circle(d["p"], d["r"] * f2, Color(1.0, 0.8, 0.3, 0.9 * f2))
@@ -812,6 +826,35 @@ func _draw_edge_arrow(vp: Vector2, target: Vector2, col: Color) -> void:
 
 ## 除錯：在指定螢幕座標製造一次撞牆光（截圖用）
 var debug_freeze: bool = false
+## 延遲測試：點螢幕的時刻 vs 接下來加速度峰值的時刻
+var latency_test: bool = false
+var _lat_touch_t: float = -1.0
+var latency_samples: Array[float] = []
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not latency_test:
+		return
+	if (event is InputEventScreenTouch and event.pressed) or (event is InputEventMouseButton and event.pressed):
+		_lat_touch_t = _now()
+
+
+## 每幀：若 0.4s 內有觸控，找這段時間內 |linear| 的峰值時刻
+func _step_latency() -> void:
+	if not latency_test or _lat_touch_t < 0.0:
+		return
+	var now := _now()
+	if now - _lat_touch_t < 0.4:
+		return
+	var best := Vector2(-1.0, 0.0)
+	for sm in _up_hist:
+		if sm.x >= _lat_touch_t - 0.05 and sm.x <= _lat_touch_t + 0.4 and abs(sm.y) > best.y:
+			best = Vector2(sm.x, abs(sm.y))
+	if best.x >= 0.0 and best.y > 1.5:
+		latency_samples.append(best.x - _lat_touch_t)
+		if latency_samples.size() > 10:
+			latency_samples.pop_front()
+	_lat_touch_t = -1.0
 var _js_cb_keep: JavaScriptObject
 
 

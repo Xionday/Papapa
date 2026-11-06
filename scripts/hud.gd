@@ -34,6 +34,7 @@ var dev_mode: bool = false
 @onready var _show_switch: Button = $Panel/VBox/Tests/ShowSwitch
 @onready var _test_sound: Button = $Panel/VBox/Tests/TestSound
 @onready var _zone_btn: Button = $Panel/VBox/Tests/ZoneToggle
+@onready var _lat_btn: Button = $Panel/VBox/Tests/Latency
 @onready var _move_btn: Button = $Panel/VBox/Tests/MoveToggle
 
 ## name, property, min, max, step
@@ -41,9 +42,9 @@ const PARAMS := [
 	["zone size x", "zone_scale", 0.5, 2.0, 0.1],
 	["zone distance x", "zone_dist_scale", 0.3, 2.0, 0.1],
 	["hit threshold m/s²", "hit_threshold", 0.5, 10.0, 0.25],
-	["miss above (h/apex)", "judge_miss_above", 0.2, 0.9, 0.02],
-	["bad above (h/apex)", "judge_bad_above", 0.05, 0.6, 0.01],
-	["good above (h/apex)", "judge_good_above", 0.02, 0.3, 0.01],
+	["perfect gap px", "judge_perfect_gap", 20.0, 300.0, 10.0],
+	["good gap px", "judge_good_gap", 100.0, 500.0, 10.0],
+	["bad gap px", "judge_bad_gap", 200.0, 700.0, 10.0],
 	["grace after land s", "grace_after", 0.0, 0.3, 0.01],
 	["screen width cm", "screen_width_cm", 5.0, 10.0, 0.1],
 	["move px per m", "px_per_m", 1000.0, 16000.0, 250.0],
@@ -124,10 +125,22 @@ func _ready() -> void:
 	_move_btn.pressed.connect(func():
 		_game.move_enabled = not _game.move_enabled
 		_move_btn.text = "move: on" if _game.move_enabled else "move: off")
+	_lat_btn.pressed.connect(func():
+		_game.latency_test = not _game.latency_test
+		_game.latency_samples.clear()
+		_lat_btn.text = "latency: on" if _game.latency_test else "latency test"
+		if _game.latency_test:
+			_show_msg("tap the screen firmly 10 times"))
 	_zone_btn.text = "zone: on" if _game.zone_mode else "zone: off"
 	_zone_btn.pressed.connect(func():
 		_game.zone_mode = not _game.zone_mode
-		_zone_btn.text = "zone: on" if _game.zone_mode else "zone: off")
+		_lat_btn.pressed.connect(func():
+		_game.latency_test = not _game.latency_test
+		_game.latency_samples.clear()
+		_lat_btn.text = "latency: on" if _game.latency_test else "latency test"
+		if _game.latency_test:
+			_show_msg("tap the screen firmly 10 times"))
+	_zone_btn.text = "zone: on" if _game.zone_mode else "zone: off")
 	_test_sound.pressed.connect(func():
 		_game.get_node("Sfx").play("perfect")
 		_show_msg("sound: perfect"))
@@ -178,7 +191,7 @@ func _on_judged(grade: String, dt: float, streak: int, score: int) -> void:
 	_judge.text = grade.to_upper()
 	_judge.add_theme_color_override("font_color", GRADE_COLOR[grade])
 	_judge_timer = 0.7
-	_last_event = "%s  h/apex %.2f  dt %+.0f ms  peak %.1f" % [grade, _game.last_h_ratio, dt * 1000.0, _game.last_peak]
+	_last_event = "%s  gap %.0f px  dt %+.0f ms  peak %.1f" % [grade, _game.last_gap, dt * 1000.0, _game.last_peak]
 
 
 func _on_stopped(streak: int, score: int, st: Dictionary) -> void:
@@ -194,9 +207,9 @@ func _on_stopped(streak: int, score: int, st: Dictionary) -> void:
 	_r_grades.get_node("Bad/N").text = "%d" % c["bad"]
 	_r_grades.get_node("Miss/N").text = "%d" % c["miss"]
 	_r_dev.visible = dev_mode
-	_r_dev.text = "offset avg %+.0f  med %+.0f  min %+.0f  max %+.0f ms   peak %.1f\nheight thresholds miss>%.2f bad>%.2f good>%.2f" % [
+	_r_dev.text = "offset avg %+.0f  med %+.0f  min %+.0f  max %+.0f ms   peak %.1f\ngap thresholds P<=%.0f G<=%.0f B<=%.0f px" % [
 		st["dt_avg"] * 1000.0, st["dt_med"] * 1000.0, st["dt_min"] * 1000.0, st["dt_max"] * 1000.0,
-		st["peak_avg"], _game.judge_miss_above, _game.judge_bad_above, _game.judge_good_above]
+		st["peak_avg"], _game.judge_perfect_gap, _game.judge_good_gap, _game.judge_bad_gap]
 	_results.visible = true
 
 
@@ -223,4 +236,19 @@ func _process(delta: float) -> void:
 		"up accel %+5.1f   horiz %4.1f   h %.2f m   zone %d left %d" % [_game.up_accel, _game.horiz_accel.length(), _game.ball_h, _game.zone_index, _game.zone_left],
 		"tilt %+4.1f %+4.1f   vel %+.2f %+.2f   last move %.0f px" % [_game.tilt.x, _game.tilt.y, _game.phone_vel.x, _game.phone_vel.y, _game.last_move_px],
 		_last_event,
+		_latency_line(),
 	])
+
+
+func _latency_line() -> String:
+	if not _game.latency_test:
+		return ""
+	var n: int = _game.latency_samples.size()
+	if n == 0:
+		return "latency: tap firmly..."
+	var sum := 0.0
+	for v in _game.latency_samples:
+		sum += v
+	var sorted: Array[float] = _game.latency_samples.duplicate()
+	sorted.sort()
+	return "latency touch→accel: avg %+.0f ms  med %+.0f ms  (n=%d)" % [sum / n * 1000.0, sorted[n / 2] * 1000.0, n]
