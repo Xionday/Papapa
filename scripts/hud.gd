@@ -195,9 +195,9 @@ func _on_stopped(streak: int, score: int, st: Dictionary) -> void:
 	_last_event = "STOPPED  last %s  peak %.1f" % [_game.last_grade, _game.last_peak]
 	var c: Dictionary = st["counts"]
 	_r_reason.text = "OUT OF THE ZONE" if _game.fell_outside else "TWO BAD HITS"
-	_r_count.text = "%d" % streak
-	var is_best: bool = streak >= _game.best_streak and streak > 0
-	_r_best.text = "NEW BEST" if is_best else "BEST %d" % _game.best_streak
+	_r_count.text = "%d" % score
+	var is_best: bool = score >= _game.best_score and score > 0
+	_r_best.text = ("NEW BEST   x%d" % streak) if is_best else ("BEST %d   x%d" % [_game.best_score, streak])
 	_r_grades.get_node("Perfect/N").text = "%d" % c["perfect"]
 	_r_grades.get_node("Good/N").text = "%d" % c["good"]
 	_r_grades.get_node("Bad/N").text = "%d" % c["bad"]
@@ -228,7 +228,7 @@ func _process(delta: float) -> void:
 	_score.text = "%d" % _game.score
 	_game.counter_visible = not _menu.visible and not _results.visible
 	if _menu.visible:
-		_menu_best.text = "BEST %d" % _game.best_streak
+		_menu_best.text = "BEST %d" % _game.best_score
 	_debug.text = "\n".join([
 		"sensor %s  %d Hz  fps %d  haptic %s" % [_sensor.status, _sensor.hz, Engine.get_frames_per_second(), _sensor.haptic_mode],
 		"up accel %+5.1f   horiz %4.1f   h %.2f m   zone %d left %d" % [_game.up_accel, _game.horiz_accel.length(), _game.ball_h, _game.zone_index, _game.zone_left],

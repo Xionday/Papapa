@@ -46,31 +46,64 @@
     hideButton();
   }
 
-  var btn;
-  function hideButton() { if (btn) btn.style.display = "none"; }
+  var overlay, btn, msgEl;
+  function hideButton() {
+    if (!overlay) return;
+    overlay.style.opacity = "0";
+    setTimeout(function () { if (overlay) overlay.style.display = "none"; }, 350);
+  }
+  function setMsg(t) { if (msgEl) msgEl.textContent = t; }
 
   function request() {
-    if (typeof DeviceMotionEvent === "undefined") { M.status = "unsupported"; hideButton(); return; }
+    if (typeof DeviceMotionEvent === "undefined") { M.status = "unsupported"; setMsg("This device has no motion sensors."); return; }
     if (typeof DeviceMotionEvent.requestPermission === "function") {
       M.status = "requesting";
       DeviceMotionEvent.requestPermission().then(function (res) {
-        if (res === "granted") start(); else { M.status = "denied"; }
-      }).catch(function () { M.status = "denied"; });
+        if (res === "granted") start();
+        else { M.status = "denied"; setMsg("Motion access was denied. Reload the page and allow it, or enable it in Settings › Safari › Motion & Orientation Access."); }
+      }).catch(function () { M.status = "denied"; setMsg("Could not request motion access. Reload and try again."); });
     } else {
       start();
     }
   }
 
+  // 進入遊戲前的跳窗：iOS 要求授權必須在使用者點擊的同一個事件裡發出，所以這層是 HTML 不是 Godot。
+  // 非 iOS（不需要授權）直接開始、不顯示。
   function makeButton() {
-    btn = document.createElement("button");
-    btn.textContent = "啟用感測器";
-    btn.style.cssText = [
-      "position:fixed", "left:50%", "top:16px", "transform:translateX(-50%)",
-      "z-index:9999", "padding:14px 28px", "font-size:18px", "border:0",
-      "border-radius:12px", "background:#d85a30", "color:#fff", "font-family:sans-serif"
-    ].join(";");
+    var needsPrompt = typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function";
+    if (!needsPrompt) { request(); return; }
+    var css = document.createElement("style");
+    css.textContent = [
+      "#plpl-gate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;",
+      "background:rgba(28,22,22,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);",
+      "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;transition:opacity .35s ease}",
+      "#plpl-gate .card{width:min(86vw,420px);background:#2b2425;border:1px solid rgba(255,255,255,.12);border-radius:28px;",
+      "padding:36px 28px 28px;text-align:center;color:#fff2d9;box-shadow:0 20px 60px rgba(0,0,0,.45)}",
+      "#plpl-gate .mark{width:84px;height:84px;margin:0 auto 18px;border-radius:22px;background:#fff2d9;position:relative}",
+      "#plpl-gate .mark .p{position:absolute;left:50%;top:38%;width:38px;height:38px;margin:-19px 0 0 -19px;border-radius:50%;background:#e86b66;box-shadow:0 0 0 3px #8c6640}",
+      "#plpl-gate .mark .h{position:absolute;left:50%;top:60%;width:12px;height:22px;margin-left:-6px;background:#c79e6b;border-radius:3px}",
+      "#plpl-gate .mark .b{position:absolute;left:62%;top:18%;width:16px;height:16px;border-radius:50%;background:#ffdd33}",
+      "#plpl-gate h1{font-size:30px;margin:0 0 6px;letter-spacing:.5px;font-weight:700}",
+      "#plpl-gate p{font-size:15px;line-height:1.5;color:rgba(255,242,217,.7);margin:0 0 24px}",
+      "#plpl-gate button{width:100%;border:0;border-radius:20px;padding:18px;font-size:20px;font-weight:700;",
+      "background:#fff2d9;color:#332919;letter-spacing:.5px}",
+      "#plpl-gate button:active{transform:scale(.98)}",
+      "#plpl-gate .msg{min-height:18px;font-size:13px;color:#ffc46b;margin-top:14px}"
+    ].join("");
+    document.head.appendChild(css);
+    overlay = document.createElement("div");
+    overlay.id = "plpl-gate";
+    overlay.innerHTML =
+      '<div class="card">' +
+      '<div class="mark"><div class="p"></div><div class="h"></div><div class="b"></div></div>' +
+      '<h1>PinLinPanLan</h1>' +
+      '<p>This game uses your phone\'s motion sensors as the paddle.<br>Allow motion access to play.</p>' +
+      '<button type="button">ENABLE MOTION</button>' +
+      '<div class="msg"></div></div>';
+    document.body.appendChild(overlay);
+    btn = overlay.querySelector("button");
+    msgEl = overlay.querySelector(".msg");
     btn.addEventListener("click", request);
-    document.body.appendChild(btn);
   }
 
   // ---- 震動 ----

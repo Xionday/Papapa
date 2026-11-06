@@ -80,7 +80,7 @@ const ZONE_STAGES := [
 @export var zone_scale: float = 1.0         ## 全部半徑的倍率（tune 用）
 @export var zone_dist_scale: float = 1.0    ## 全部距離的倍率（tune 用）
 
-const SCORE := {"perfect": 3, "good": 2, "bad": 1, "miss": 0}
+const SCORE := {"perfect": 3, "good": 1, "bad": 0, "miss": 0}
 
 ## ---- 狀態 ----
 var ball_pos: Vector2 = Vector2.ZERO        ## 世界座標，px
@@ -755,11 +755,11 @@ func _draw() -> void:
 	if counter_visible:
 		var font := ThemeDB.fallback_font
 		var c := vp * 0.5
-		var txt := "%d" % streak
+		var txt := "%d" % score
 		var fs := 260
 		var w: float = font.get_string_size(txt, HORIZONTAL_ALIGNMENT_CENTER, -1, fs).x
 		draw_string(font, Vector2(c.x - w * 0.5, c.y + fs * 0.35), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 1, 1, 0.45))
-		var bt := "BEST %d" % best_streak
+		var bt := "x%d   BEST %d" % [streak, best_score]
 		var bw: float = font.get_string_size(bt, HORIZONTAL_ALIGNMENT_CENTER, -1, 30).x
 		draw_string(font, Vector2(c.x - bw * 0.5, c.y + fs * 0.35 + 70.0), bt, HORIZONTAL_ALIGNMENT_LEFT, -1, 30, Color(1, 1, 1, 0.35))
 
