@@ -105,8 +105,8 @@ var _zone_fade: float = 0.0                 ## 舊圈淡出剩餘時間
 var _zone_grow: float = 0.0                 ## 新圈放大剩餘時間
 var _zone_hit_flash: float = 0.0
 var _wall_lights: Array = []                ## {side, at, t}  沿邊緣擴散的光
-const WALL_LIGHT_T := 0.6                   ## 光跑完的時間
-const WALL_LIGHT_SPEED := 1800.0            ## px/s，光沿邊緣跑的速度
+const WALL_LIGHT_T := 0.7                   ## 光跑完的時間
+const WALL_LIGHT_SPEED := 2600.0            ## px/s，光沿邊緣跑的速度
 const WALL_LIGHT_COL := Color(1.0, 0.92, 0.7)
 var fell_outside: bool = false              ## 這局是因為落在圈外結束
 var _ring_gold: float = 0.0                 ## PERFECT 後金環剩餘時間
@@ -133,6 +133,10 @@ var _apex_ticked: bool = false
 
 func _ready() -> void:
 	_sensor.sample.connect(_on_sample)
+	if OS.has_feature("web"):
+		var cb := JavaScriptBridge.create_callback(_js_debug)
+		JavaScriptBridge.get_interface("window").papapaDebug = cb
+		_js_cb_keep = cb
 	state = "menu"
 	score = 0
 	streak = 0
@@ -330,7 +334,8 @@ func _process(delta: float) -> void:
 
 	match state:
 		"air":
-			_step_air(delta)
+			if not debug_freeze:
+				_step_air(delta)
 		"settle":
 			_settle_timer -= delta
 			if _settle_timer <= 0.0:
@@ -544,11 +549,8 @@ func _clamp_to_screen() -> void:
 	ball_pos = paddle_pos + c
 	if hit_wall and v_lat.length() > 20.0:
 		var spn := _to_screen(ball_pos)
-		var m := edge_margin
-		if c.x != d.x:
-			_wall_lights.append({"side": "left" if spn.x <= m + 1.0 else "right", "at": spn.y, "t": 0.0})
-		if c.y != d.y:
-			_wall_lights.append({"side": "top" if spn.y <= m + 1.0 else "bottom", "at": spn.x, "t": 0.0})
+		## 撞點投影到螢幕外框（邊界矩形）上，記成「沿周長的距離」
+		_wall_lights.append({"s": _perimeter_pos(spn, get_viewport_rect().size), "t": 0.0})
 		_sfx.play("wall")
 		if rubber_mode == "alternate":
 			rubber_is_red = not rubber_is_red
@@ -570,21 +572,23 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, vp), bg)
 	if _flash > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, vp), Color(_flash_color, 0.35 * _flash))
-	## 格線：讓推動時看得出世界在動
-	var grid := 160.0
-	var off := Vector2(fposmod(-paddle_pos.x, grid), fposmod(-paddle_pos.y, grid))
-	var gc := Color(1, 1, 1, 0.06)
-	var x := off.x
-	while x < vp.x:
-		draw_line(Vector2(x, 0), Vector2(x, vp.y), gc, 1.0)
-		x += grid
-	var y := off.y
-	while y < vp.y:
-		draw_line(Vector2(0, y), Vector2(vp.x, y), gc, 1.0)
-		y += grid
-
 	if state == "menu":
 		return
+	## 格線：讓推動時看得出世界在動（位移關閉時不畫）
+	var grid := 160.0
+	if not move_enabled:
+		grid = 0.0
+	var off := Vector2(fposmod(-paddle_pos.x, grid), fposmod(-paddle_pos.y, grid)) if grid > 0.0 else Vector2.ZERO
+	var gc := Color(1, 1, 1, 0.06)
+	if grid > 0.0:
+		var x := off.x
+		while x < vp.x:
+			draw_line(Vector2(x, 0), Vector2(x, vp.y), gc, 1.0)
+			x += grid
+		var y := off.y
+		while y < vp.y:
+			draw_line(Vector2(0, y), Vector2(vp.x, y), gc, 1.0)
+			y += grid
 	## 撞牆的光：從撞到的點沿邊緣往兩側跑、漸暗
 	for w in _wall_lights:
 		_draw_wall_light(vp, w)
@@ -671,45 +675,105 @@ func _draw_edge_arrow(vp: Vector2, target: Vector2, col: Color) -> void:
 	draw_circle(ep - dir * 30.0, 8.0, Color(col, 0.6))
 
 
+## 除錯：在指定螢幕座標製造一次撞牆光（截圖用）
+var debug_freeze: bool = false
+var _js_cb_keep: JavaScriptObject
+
+
+## JS: window.papapaDebug(["wall", x, y]) / (["freeze", 1])
+func _js_debug(args: Array) -> void:
+	var a: Array = args[0] if args.size() > 0 and args[0] is Array else args
+	if a.size() == 0:
+		return
+	match str(a[0]):
+		"wall": debug_wall_hit(float(a[1]), float(a[2]))
+		"freeze":
+			debug_freeze = bool(int(a[1]))
+			if debug_freeze:
+				state = "air"
+				ball_h = 0.4
+				v_up = 2.0
+
+func debug_wall_hit(x: float, y: float) -> void:
+	_wall_lights.append({"s": _perimeter_pos(Vector2(x, y), get_viewport_rect().size), "t": 0.0})
+
+
+## 把螢幕上一點投影到外框，回傳沿周長的距離（從左上角順時針：上、右、下、左）
+func _perimeter_pos(p: Vector2, vp: Vector2) -> float:
+	var dl := p.x
+	var dr := vp.x - p.x
+	var dt := p.y
+	var db := vp.y - p.y
+	var m: float = min(min(dl, dr), min(dt, db))
+	if m == dt:
+		return clamp(p.x, 0.0, vp.x)
+	if m == dr:
+		return vp.x + clamp(p.y, 0.0, vp.y)
+	if m == db:
+		return vp.x + vp.y + (vp.x - clamp(p.x, 0.0, vp.x))
+	return 2.0 * vp.x + vp.y + (vp.y - clamp(p.y, 0.0, vp.y))
+
+
+## 周長距離 → 螢幕座標（在外框上，往內縮 inset 讓光完整落在畫面內）
+func _perimeter_point(s: float, vp: Vector2, inset: float = 0.0) -> Vector2:
+	var P: float = 2.0 * (vp.x + vp.y)
+	s = fposmod(s, P)
+	if s < vp.x:
+		return Vector2(clamp(s, inset, vp.x - inset), inset)
+	s -= vp.x
+	if s < vp.y:
+		return Vector2(vp.x - inset, clamp(s, inset, vp.y - inset))
+	s -= vp.y
+	if s < vp.x:
+		return Vector2(clamp(vp.x - s, inset, vp.x - inset), vp.y - inset)
+	s -= vp.x
+	return Vector2(inset, clamp(vp.y - s, inset, vp.y - inset))
+
+
+## 雷射式邊光：從撞點沿外框往兩側跑，四邊連成一條路徑，轉角會自然繞過去
 func _draw_wall_light(vp: Vector2, w: Dictionary) -> void:
 	var t: float = w["t"]
 	var fade: float = 1.0 - t / WALL_LIGHT_T
 	fade = fade * fade
-	var reach: float = WALL_LIGHT_SPEED * t          ## 光目前跑到離撞點多遠
-	var thick: float = edge_margin * 0.6
-	var seg := 24.0                                  ## 每段長度
-	var side: String = w["side"]
-	var horizontal: bool = side == "top" or side == "bottom"
-	var length: float = vp.x if horizontal else vp.y
-	var at: float = w["at"]
-	## 沿邊緣每一小段，依離撞點距離算亮度：越遠越暗、超過 reach 不畫
-	var pos := 0.0
-	while pos < length:
-		var mid: float = pos + seg * 0.5
-		var dist: float = abs(mid - at)
-		if dist <= reach:
-			var a: float = fade * (1.0 - dist / max(reach, 1.0)) * 0.9
-			## 撞點附近最亮、最厚
-			var th: float = thick * (0.4 + 0.6 * (1.0 - dist / max(reach, 1.0)))
-			var col := Color(WALL_LIGHT_COL, a)
-			match side:
-				"top":
-					draw_rect(Rect2(pos, 0.0, seg, th), col)
-				"bottom":
-					draw_rect(Rect2(pos, vp.y - th, seg, th), col)
-				"left":
-					draw_rect(Rect2(0.0, pos, th, seg), col)
-				"right":
-					draw_rect(Rect2(vp.x - th, pos, th, seg), col)
-		pos += seg
-	## 撞點本身：一個亮斑
-	var glow_a: float = fade * 0.8
-	var glow_r: float = 28.0 + 40.0 * (t / WALL_LIGHT_T)
-	var gp: Vector2
-	match side:
-		"top": gp = Vector2(at, 0.0)
-		"bottom": gp = Vector2(at, vp.y)
-		"left": gp = Vector2(0.0, at)
-		"right": gp = Vector2(vp.x, at)
-	draw_circle(gp, glow_r, Color(WALL_LIGHT_COL, glow_a * 0.35))
-	draw_circle(gp, glow_r * 0.4, Color(1.0, 0.97, 0.85, glow_a))
+	var reach: float = WALL_LIGHT_SPEED * t
+	var P: float = 2.0 * (vp.x + vp.y)
+	reach = min(reach, P * 0.5)
+	var s0: float = w["s"]
+	var seg := 12.0
+	var inset := 6.0
+	## 兩個方向各畫一條 polyline，分段設透明度（越遠越暗）
+	for dir in [1.0, -1.0]:
+		var d := 0.0
+		while d < reach:
+			var d2: float = min(d + seg, reach)
+			var a0: Vector2 = _perimeter_point(s0 + dir * d, vp, inset)
+			var a1: Vector2 = _perimeter_point(s0 + dir * d2, vp, inset)
+			var k: float = 1.0 - d / max(reach, 1.0)
+			var alpha: float = fade * k
+			## 轉角：兩點不在同一條邊時，補上角落點，讓線貼著框轉彎
+			if a0.x != a1.x and a0.y != a1.y:
+				var on_v0: bool = (a0.x == inset or a0.x == vp.x - inset)
+				var on_h0: bool = (a0.y == inset or a0.y == vp.y - inset)
+				var corner := Vector2(
+					a0.x if on_v0 else a1.x,
+					a0.y if on_h0 else a1.y)
+				_laser_seg(a0, corner, alpha, k)
+				_laser_seg(corner, a1, alpha, k)
+			else:
+				_laser_seg(a0, a1, alpha, k)
+			d = d2
+	## 撞點核心：短而亮
+	var hp: Vector2 = _perimeter_point(s0, vp, inset)
+	draw_circle(hp, 14.0 + 30.0 * (t / WALL_LIGHT_T), Color(WALL_LIGHT_COL, fade * 0.35))
+	draw_circle(hp, 8.0 + 10.0 * (t / WALL_LIGHT_T), Color(1.0, 0.98, 0.9, fade))
+
+
+## 一段雷射：外層寬而淡（光暈）、內層細而亮（核心）
+func _laser_seg(a: Vector2, b: Vector2, alpha: float, k: float) -> void:
+	if a == b:
+		return
+	## 光暈往畫面內側偏，核心貼著邊
+	draw_line(a, b, Color(WALL_LIGHT_COL, alpha * 0.18), 36.0 + 16.0 * k)
+	draw_line(a, b, Color(WALL_LIGHT_COL, alpha * 0.5), 14.0 + 6.0 * k)
+	draw_line(a, b, Color(1.0, 0.98, 0.9, alpha), 4.0)
+

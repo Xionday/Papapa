@@ -16,7 +16,9 @@ extends CanvasLayer
 @onready var _results_text: Label = $Results/VBox/Text
 @onready var _again_btn: Button = $Results/VBox/PlayAgain
 @onready var _menu_btn: Button = $Results/VBox/Menu
-@onready var _menu: PanelContainer = $Menu
+@onready var _menu: Control = $Menu
+@onready var _dev_toggle: CheckButton = $Menu/VBox/DevRow/Dev
+var dev_mode: bool = false
 @onready var _endless_btn: Button = $Menu/VBox/Endless
 @onready var _zone_mode_btn: Button = $Menu/VBox/Zone
 @onready var _rubber_red: Button = $Menu/VBox/Rubber/Red
@@ -83,6 +85,11 @@ func _ready() -> void:
 			_game.rubber_mode = m
 			_refresh_rubber_buttons())
 	_refresh_rubber_buttons()
+	_dev_toggle.button_pressed = dev_mode
+	_dev_toggle.toggled.connect(func(on: bool):
+		dev_mode = on
+		if not on:
+			_panel.visible = false)
 	_endless_btn.pressed.connect(func():
 		_menu.visible = false
 		_game.start_game("endless"))
@@ -149,7 +156,7 @@ func _build_sliders() -> void:
 func _refresh_rubber_buttons() -> void:
 	for pair in [[_rubber_red, "red"], [_rubber_black, "black"], [_rubber_alt, "alternate"]]:
 		var b: Button = pair[0]
-		b.disabled = (_game.rubber_mode == pair[1])
+		b.get_node("Icon").selected = (_game.rubber_mode == pair[1])
 
 
 func _fmt(v: float) -> String:
@@ -202,8 +209,9 @@ func _process(delta: float) -> void:
 	_judge_timer -= delta
 	if _judge_timer <= 0.0:
 		_judge.text = ""
-	_debug.visible = not _results.visible and not _menu.visible
+	_debug.visible = dev_mode and not _results.visible and not _menu.visible
 	$Top.visible = not _menu.visible
+	$Buttons.visible = dev_mode and not _menu.visible
 	_combo.text = "combo %d   (best %d)" % [_game.streak, _game.best_streak]
 	_score.text = "%d" % _game.score
 	## 正中央：連擊數大字、最佳小字

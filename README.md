@@ -35,6 +35,14 @@ HUD 右下 `tune` 開參數滑桿、`zero` 把目前握持角度設為水平。H
 | `export_presets.cfg` | Web 匯出設定（thread_support=false，head_include 載入 motion.js） |
 | `.github/workflows/deploy.yml` | push 到 main 就匯出並部署 Pages |
 
+## 測試腳本
+
+| 腳本 | 用途 |
+|---|---|
+| `tests/sim_move.gd` | 位移模型：合成移動曲線比較各參數的位移與飄移（headless） |
+| `tests/sim_game.gd` | 整場景：餵合成感測器資料驗證位移、靜止飄移、光圈命中（headless） |
+| `tests/render_wall.gd` | 離線渲染撞牆雷射光到 `build/*.png`（需 xvfb，不能 headless） |
+
 ## 下一步
 
 第 3 步：依實測調手感；若要中文 UI，子集化 Noto Sans TC 打包。

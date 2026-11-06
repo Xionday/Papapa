@@ -1,9 +1,37 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
 [ext_resource type="Script" path="res://scripts/sensor_bridge.gd" id="2_sensor"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="3_hud"]
 [ext_resource type="Script" path="res://scripts/sfx.gd" id="4_sfx"]
+[ext_resource type="Script" path="res://scripts/paddle_icon.gd" id="5_icon"]
+
+[sub_resource type="StyleBoxFlat" id="btn_primary"]
+content_margin_left = 24.0
+content_margin_top = 18.0
+content_margin_right = 24.0
+content_margin_bottom = 18.0
+bg_color = Color(1, 0.92, 0.7, 1)
+corner_radius_top_left = 20
+corner_radius_top_right = 20
+corner_radius_bottom_right = 20
+corner_radius_bottom_left = 20
+
+[sub_resource type="StyleBoxFlat" id="btn_ghost"]
+content_margin_left = 24.0
+content_margin_top = 12.0
+content_margin_right = 24.0
+content_margin_bottom = 12.0
+bg_color = Color(1, 1, 1, 0.08)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 1, 1, 0.2)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
 
 [sub_resource type="StyleBoxFlat" id="results_bg"]
 content_margin_left = 32.0
@@ -222,74 +250,137 @@ custom_minimum_size = Vector2(0, 64)
 theme_override_font_sizes/font_size = 26
 text = "back to menu"
 
-[node name="Menu" type="PanelContainer" parent="HUD"]
-anchors_preset = -1
-anchor_left = 0.08
-anchor_top = 0.5
-anchor_right = 0.92
-anchor_bottom = 0.5
-offset_top = -380.0
-offset_bottom = 380.0
-theme_override_styles/panel = SubResource("results_bg")
+[node name="Menu" type="Control" parent="HUD"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="VBox" type="VBoxContainer" parent="HUD/Menu"]
-layout_mode = 2
-theme_override_constants/separation = 28
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 48.0
+offset_top = 140.0
+offset_right = -48.0
+offset_bottom = -80.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 20
 alignment = 1
+
+[node name="Spacer0" type="Control" parent="HUD/Menu/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
 
 [node name="Title" type="Label" parent="HUD/Menu/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 72
-text = "Papapa"
+theme_override_colors/font_color = Color(1, 0.95, 0.85, 1)
+theme_override_font_sizes/font_size = 120
+text = "PAPAPA"
 horizontal_alignment = 1
 
-[node name="Hint" type="Label" parent="HUD/Menu/VBox"]
+[node name="Sub" type="Label" parent="HUD/Menu/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.6)
-theme_override_font_sizes/font_size = 24
-text = "hold the phone flat, swing up to hit"
+theme_override_colors/font_color = Color(1, 1, 1, 0.55)
+theme_override_font_sizes/font_size = 26
+text = "hold flat  ·  swing up  ·  keep it going"
 horizontal_alignment = 1
+
+[node name="Spacer1" type="Control" parent="HUD/Menu/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 40)
 
 [node name="RubberLabel" type="Label" parent="HUD/Menu/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.6)
+theme_override_colors/font_color = Color(1, 1, 1, 0.5)
 theme_override_font_sizes/font_size = 22
-text = "rubber"
+text = "PADDLE"
 horizontal_alignment = 1
 
 [node name="Rubber" type="HBoxContainer" parent="HUD/Menu/VBox"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 24
+alignment = 1
 
 [node name="Red" type="Button" parent="HUD/Menu/VBox/Rubber"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 72)
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 26
-text = "red"
+custom_minimum_size = Vector2(170, 190)
+flat = true
+
+[node name="Icon" type="Control" parent="HUD/Menu/VBox/Rubber/Red"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("5_icon")
+mode = "red"
 
 [node name="Black" type="Button" parent="HUD/Menu/VBox/Rubber"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 72)
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 26
-text = "black"
+custom_minimum_size = Vector2(170, 190)
+flat = true
+
+[node name="Icon" type="Control" parent="HUD/Menu/VBox/Rubber/Black"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("5_icon")
+mode = "black"
 
 [node name="Alt" type="Button" parent="HUD/Menu/VBox/Rubber"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 72)
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 26
-text = "flip"
+custom_minimum_size = Vector2(170, 190)
+flat = true
+
+[node name="Icon" type="Control" parent="HUD/Menu/VBox/Rubber/Alt"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("5_icon")
+mode = "alternate"
+
+[node name="Spacer2" type="Control" parent="HUD/Menu/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 24)
 
 [node name="Endless" type="Button" parent="HUD/Menu/VBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 110)
-theme_override_font_sizes/font_size = 36
-text = "endless"
+theme_override_colors/font_color = Color(0.2, 0.16, 0.1, 1)
+theme_override_colors/font_hover_color = Color(0.2, 0.16, 0.1, 1)
+theme_override_colors/font_pressed_color = Color(0.2, 0.16, 0.1, 1)
+theme_override_font_sizes/font_size = 40
+theme_override_styles/normal = SubResource("btn_primary")
+theme_override_styles/hover = SubResource("btn_primary")
+theme_override_styles/pressed = SubResource("btn_primary")
+text = "PLAY"
 
 [node name="Zone" type="Button" parent="HUD/Menu/VBox"]
+visible = false
 layout_mode = 2
-custom_minimum_size = Vector2(0, 110)
-theme_override_font_sizes/font_size = 36
-text = "zone"
+custom_minimum_size = Vector2(0, 80)
+theme_override_font_sizes/font_size = 30
+theme_override_styles/normal = SubResource("btn_ghost")
+text = "zone (wip)"
+
+[node name="Spacer3" type="Control" parent="HUD/Menu/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="DevRow" type="HBoxContainer" parent="HUD/Menu/VBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="Dev" type="CheckButton" parent="HUD/Menu/VBox/DevRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.45)
+theme_override_font_sizes/font_size = 22
+text = "developer mode"
