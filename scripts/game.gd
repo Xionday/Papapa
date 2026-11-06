@@ -668,7 +668,7 @@ func _spawn_ash() -> void:
 func _gold_ring_r(t: float) -> float:
 	var u: float = clamp(t / 0.6, 0.0, 1.0)
 	u = 1.0 - (1.0 - u) * (1.0 - u)
-	return lerp(BALL_R_LAND + 12.0, 230.0, u)
+	return lerp(BALL_R_LAND + 12.0, 130.0, u)   ## 影子最大 90、球最大 120，略超過一點
 
 
 func _step_ash(delta: float) -> void:
