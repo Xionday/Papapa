@@ -29,6 +29,12 @@ signal pushed(step: Vector2)
 @export var center_strength: float = 0.0    ## 每次拍起，球在飛行中回到螢幕中心的比例（0 = 不回中）
 @export var edge_margin: float = 40.0       ## px，球離螢幕邊緣最少保留（endless 模式）
 @export var wall_bounce: float = 0.6        ## 撞牆回彈係數：0 = 停住，1 = 全反彈
+## 拍面顏色：red | black | alternate（每次撞牆換面，模擬正反拍）
+@export var rubber_mode: String = "red"
+const RUBBER_RED := Color(0.91, 0.42, 0.40)
+const RUBBER_BLACK := Color(0.16, 0.16, 0.17)
+var rubber_is_red: bool = true
+var _rubber_blend: float = 1.0              ## 0 = 黑，1 = 紅，換面時漸變
 @export var clamp_in_zone_mode: bool = false ## 光圈模式不鎖邊界：球釘在世界裡，鏡頭怎麼移都不會被推著走
 @export var good_launch: float = 0.9        ## GOOD 的起跳速度倍率
 @export var bad_launch: float = 0.6         ## BAD / MISS 的起跳速度倍率
@@ -98,8 +104,10 @@ var _zone_old_r: float = 0.0
 var _zone_fade: float = 0.0                 ## 舊圈淡出剩餘時間
 var _zone_grow: float = 0.0                 ## 新圈放大剩餘時間
 var _zone_hit_flash: float = 0.0
-var _wall_flash: float = 0.0
-var _wall_pos: Vector2 = Vector2.ZERO
+var _wall_lights: Array = []                ## {side, at, t}  沿邊緣擴散的光
+const WALL_LIGHT_T := 0.6                   ## 光跑完的時間
+const WALL_LIGHT_SPEED := 1800.0            ## px/s，光沿邊緣跑的速度
+const WALL_LIGHT_COL := Color(1.0, 0.92, 0.7)
 var fell_outside: bool = false              ## 這局是因為落在圈外結束
 var _ring_gold: float = 0.0                 ## PERFECT 後金環剩餘時間
 var _ring_gold_total: float = 0.5           ## 金環總時長 = 這次彈起到最高點的時間
@@ -137,6 +145,8 @@ func _ready() -> void:
 func start_game(mode: String) -> void:
 	zone_mode = (mode == "zone")
 	px_per_m = get_viewport_rect().size.x / (screen_width_cm / 100.0)
+	rubber_is_red = rubber_mode != "black"
+	_rubber_blend = 1.0 if rubber_is_red else 0.0
 	if zone_mode:
 		full_launch = zone_launch
 		lateral_gain = zone_lateral_gain
@@ -310,7 +320,11 @@ func _process(delta: float) -> void:
 	_zone_fade = max(0.0, _zone_fade - delta)
 	_zone_grow = max(0.0, _zone_grow - delta)
 	_zone_hit_flash = max(0.0, _zone_hit_flash - delta)
-	_wall_flash = max(0.0, _wall_flash - delta)
+	for w in _wall_lights:
+		w["t"] += delta
+	_wall_lights = _wall_lights.filter(func(w): return w["t"] < WALL_LIGHT_T)
+	var target_blend: float = 1.0 if rubber_is_red else 0.0
+	_rubber_blend += (target_blend - _rubber_blend) * (1.0 - exp(-10.0 * delta))
 	_step_move(delta)
 	_step_ash(delta)
 
@@ -529,9 +543,15 @@ func _clamp_to_screen() -> void:
 		hit_wall = true
 	ball_pos = paddle_pos + c
 	if hit_wall and v_lat.length() > 20.0:
-		_wall_flash = 0.2
-		_wall_pos = _to_screen(ball_pos)
+		var spn := _to_screen(ball_pos)
+		var m := edge_margin
+		if c.x != d.x:
+			_wall_lights.append({"side": "left" if spn.x <= m + 1.0 else "right", "at": spn.y, "t": 0.0})
+		if c.y != d.y:
+			_wall_lights.append({"side": "top" if spn.y <= m + 1.0 else "bottom", "at": spn.x, "t": 0.0})
 		_sfx.play("wall")
+		if rubber_mode == "alternate":
+			rubber_is_red = not rubber_is_red
 
 
 ## ---- 畫面 ----
@@ -546,7 +566,8 @@ const RING_R_MAX := 150.0
 
 func _draw() -> void:
 	var vp := get_viewport_rect().size
-	draw_rect(Rect2(Vector2.ZERO, vp), Color(0.18, 0.18, 0.17))
+	var bg := RUBBER_BLACK.lerp(RUBBER_RED, _rubber_blend) if state != "menu" else Color(0.18, 0.18, 0.17)
+	draw_rect(Rect2(Vector2.ZERO, vp), bg)
 	if _flash > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, vp), Color(_flash_color, 0.35 * _flash))
 	## 格線：讓推動時看得出世界在動
@@ -564,19 +585,9 @@ func _draw() -> void:
 
 	if state == "menu":
 		return
-	## 撞牆閃光：在撞到的那一側畫一條亮邊
-	if _wall_flash > 0.0:
-		var f: float = _wall_flash / 0.2
-		var wc := Color(1, 1, 1, 0.5 * f)
-		var m := edge_margin
-		if _wall_pos.x <= m + 1.0:
-			draw_rect(Rect2(0, 0, m, vp.y), wc)
-		elif _wall_pos.x >= vp.x - m - 1.0:
-			draw_rect(Rect2(vp.x - m, 0, m, vp.y), wc)
-		if _wall_pos.y <= m + 1.0:
-			draw_rect(Rect2(0, 0, vp.x, m), wc)
-		elif _wall_pos.y >= vp.y - m - 1.0:
-			draw_rect(Rect2(0, vp.y - m, vp.x, m), wc)
+	## 撞牆的光：從撞到的點沿邊緣往兩側跑、漸暗
+	for w in _wall_lights:
+		_draw_wall_light(vp, w)
 	if zone_mode:
 		_draw_zone(vp)
 
@@ -658,3 +669,47 @@ func _draw_edge_arrow(vp: Vector2, target: Vector2, col: Color) -> void:
 	var tri := PackedVector2Array([ep + dir * 24.0, ep - dir * 10.0 + perp * 18.0, ep - dir * 10.0 - perp * 18.0])
 	draw_colored_polygon(tri, col)
 	draw_circle(ep - dir * 30.0, 8.0, Color(col, 0.6))
+
+
+func _draw_wall_light(vp: Vector2, w: Dictionary) -> void:
+	var t: float = w["t"]
+	var fade: float = 1.0 - t / WALL_LIGHT_T
+	fade = fade * fade
+	var reach: float = WALL_LIGHT_SPEED * t          ## 光目前跑到離撞點多遠
+	var thick: float = edge_margin * 0.6
+	var seg := 24.0                                  ## 每段長度
+	var side: String = w["side"]
+	var horizontal: bool = side == "top" or side == "bottom"
+	var length: float = vp.x if horizontal else vp.y
+	var at: float = w["at"]
+	## 沿邊緣每一小段，依離撞點距離算亮度：越遠越暗、超過 reach 不畫
+	var pos := 0.0
+	while pos < length:
+		var mid: float = pos + seg * 0.5
+		var dist: float = abs(mid - at)
+		if dist <= reach:
+			var a: float = fade * (1.0 - dist / max(reach, 1.0)) * 0.9
+			## 撞點附近最亮、最厚
+			var th: float = thick * (0.4 + 0.6 * (1.0 - dist / max(reach, 1.0)))
+			var col := Color(WALL_LIGHT_COL, a)
+			match side:
+				"top":
+					draw_rect(Rect2(pos, 0.0, seg, th), col)
+				"bottom":
+					draw_rect(Rect2(pos, vp.y - th, seg, th), col)
+				"left":
+					draw_rect(Rect2(0.0, pos, th, seg), col)
+				"right":
+					draw_rect(Rect2(vp.x - th, pos, th, seg), col)
+		pos += seg
+	## 撞點本身：一個亮斑
+	var glow_a: float = fade * 0.8
+	var glow_r: float = 28.0 + 40.0 * (t / WALL_LIGHT_T)
+	var gp: Vector2
+	match side:
+		"top": gp = Vector2(at, 0.0)
+		"bottom": gp = Vector2(at, vp.y)
+		"left": gp = Vector2(0.0, at)
+		"right": gp = Vector2(vp.x, at)
+	draw_circle(gp, glow_r, Color(WALL_LIGHT_COL, glow_a * 0.35))
+	draw_circle(gp, glow_r * 0.4, Color(1.0, 0.97, 0.85, glow_a))

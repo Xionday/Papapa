@@ -19,6 +19,12 @@ extends CanvasLayer
 @onready var _menu: PanelContainer = $Menu
 @onready var _endless_btn: Button = $Menu/VBox/Endless
 @onready var _zone_mode_btn: Button = $Menu/VBox/Zone
+@onready var _rubber_red: Button = $Menu/VBox/Rubber/Red
+@onready var _rubber_black: Button = $Menu/VBox/Rubber/Black
+@onready var _rubber_alt: Button = $Menu/VBox/Rubber/Alt
+@onready var _center: VBoxContainer = $Center
+@onready var _center_score: Label = $Center/Score
+@onready var _center_combo: Label = $Center/Combo
 @onready var _test_haptic: Button = $Panel/VBox/Tests/TestHaptic
 @onready var _show_switch: Button = $Panel/VBox/Tests/ShowSwitch
 @onready var _test_sound: Button = $Panel/VBox/Tests/TestSound
@@ -70,6 +76,13 @@ func _ready() -> void:
 	move_child(_panel, -1)
 	_results.visible = false
 	_menu.visible = true
+	for pair in [[_rubber_red, "red"], [_rubber_black, "black"], [_rubber_alt, "alternate"]]:
+		var b: Button = pair[0]
+		var m: String = pair[1]
+		b.pressed.connect(func():
+			_game.rubber_mode = m
+			_refresh_rubber_buttons())
+	_refresh_rubber_buttons()
 	_endless_btn.pressed.connect(func():
 		_menu.visible = false
 		_game.start_game("endless"))
@@ -133,6 +146,12 @@ func _build_sliders() -> void:
 		_sliders_box.add_child(row)
 
 
+func _refresh_rubber_buttons() -> void:
+	for pair in [[_rubber_red, "red"], [_rubber_black, "black"], [_rubber_alt, "alternate"]]:
+		var b: Button = pair[0]
+		b.disabled = (_game.rubber_mode == pair[1])
+
+
 func _fmt(v: float) -> String:
 	return "%.2f" % v if v < 10.0 else "%.0f" % v
 
@@ -187,6 +206,10 @@ func _process(delta: float) -> void:
 	$Top.visible = not _menu.visible
 	_combo.text = "combo %d   (best %d)" % [_game.streak, _game.best_streak]
 	_score.text = "%d" % _game.score
+	## 正中央：連擊數大字、最佳小字
+	_center.visible = not _menu.visible and not _results.visible
+	_center_score.text = "%d" % _game.streak
+	_center_combo.text = "BEST %d" % _game.best_streak
 	_debug.text = "\n".join([
 		"sensor %s  %d Hz  fps %d  haptic %s" % [_sensor.status, _sensor.hz, Engine.get_frames_per_second(), _sensor.haptic_mode],
 		"up accel %+5.1f   horiz %4.1f   h %.2f m   zone %d left %d" % [_game.up_accel, _game.horiz_accel.length(), _game.ball_h, _game.zone_index, _game.zone_left],
