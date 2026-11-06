@@ -46,6 +46,15 @@ const BALL_YELLOW := Color(1.0, 0.87, 0.2)
 const BALL_WHITE := Color(0.98, 0.98, 0.95)
 var _flip_timer: float = -1.0
 var counter_visible: bool = false
+## 連擊特效
+@export var combo_wave_at: int = 10         ## 邊緣白色波浪
+@export var combo_smoke_at: int = 20        ## 球冒煙
+@export var combo_gold_at: int = 30         ## 波浪變金黃
+@export var combo_fire_at: int = 40         ## 小火
+@export var combo_bigfire_at: int = 50      ## 大火
+var _wave_phase: float = 0.0
+var _wave_level: float = 0.0                ## 0~1，進入/離開時漸變
+var _trail: Array = []                      ## 球的軌跡粒子 {p, v, life, max, r, kind}
 ## 待機球：首頁與結算頁上隨傾斜滾動的裝飾球（螢幕座標）
 var idle_pos: Vector2 = Vector2.ZERO
 var idle_vel: Vector2 = Vector2.ZERO
@@ -427,6 +436,7 @@ func _process(delta: float) -> void:
 	_rubber_blend += (target_blend - _rubber_blend) * (1.0 - exp(-10.0 * delta))
 	_step_move(delta)
 	_step_ash(delta)
+	_step_combo_fx(delta)
 
 	_step_idle(delta)
 	_step_latency()
@@ -671,6 +681,55 @@ func _gold_ring_r(t: float) -> float:
 	return lerp(BALL_R_LAND + 12.0, 130.0, u)   ## 影子最大 90、球最大 120，略超過一點
 
 
+## 連擊特效的更新：波浪相位、球軌跡粒子
+func _step_combo_fx(delta: float) -> void:
+	var want: float = 1.0 if (state == "air" or state == "settle") and streak >= combo_wave_at else 0.0
+	_wave_level += (want - _wave_level) * (1.0 - exp(-4.0 * delta))
+	_wave_phase += delta * 2.2
+	## 軌跡：球可見且在空中才噴
+	var emitting: bool = state == "air" and ball_h <= show_height and streak >= combo_smoke_at
+	if emitting:
+		var sp := _to_screen(ball_pos)
+		var k: float = clamp(ball_h / show_height, 0.0, 1.0)
+		var br: float = lerp(BALL_R_LAND, BALL_R_HIGH, k)
+		if streak >= combo_bigfire_at:
+			for i in 6:
+				_emit_trail(sp, br, "fire", 1.6)
+		elif streak >= combo_fire_at:
+			for i in 4:
+				_emit_trail(sp, br, "fire", 1.15)
+		else:
+			_emit_trail(sp, br, "smoke", 1.0)
+	var alive: Array = []
+	for d in _trail:
+		d["life"] -= delta
+		if d["life"] <= 0.0:
+			continue
+		d["p"] += d["v"] * delta
+		if d["kind"] == "smoke":
+			d["v"] = d["v"] * exp(-1.0 * delta) + Vector2(randf_range(-25.0, 25.0), -30.0) * delta
+			d["r"] += 22.0 * delta
+		else:
+			d["v"] = d["v"] * exp(-2.0 * delta) + Vector2(randf_range(-60.0, 60.0), -140.0) * delta
+		alive.append(d)
+	_trail = alive
+	if _trail.size() > 220:
+		_trail = _trail.slice(_trail.size() - 220)
+
+
+func _emit_trail(sp: Vector2, br: float, kind: String, scale: float) -> void:
+	var a: float = randf_range(0.0, TAU)
+	var off := Vector2(cos(a), sin(a)) * br * randf_range(0.2, 0.7)
+	if kind == "fire":
+		off.y = -abs(off.y) - br * 0.3   ## 火從球的上半冒出
+	if kind == "smoke":
+		_trail.append({"p": sp + off, "v": Vector2(randf_range(-30.0, 30.0), randf_range(-110.0, -60.0)),
+			"life": randf_range(0.7, 1.0), "max": 1.0, "r": randf_range(10.0, 16.0), "kind": "smoke"})
+	else:
+		_trail.append({"p": sp + off, "v": Vector2(randf_range(-70.0, 70.0), randf_range(-220.0, -120.0)) * scale,
+			"life": randf_range(0.3, 0.5) * scale, "max": 0.5 * scale, "r": randf_range(7.0, 12.0) * scale, "kind": "fire"})
+
+
 func _step_ash(delta: float) -> void:
 	if _ash.is_empty():
 		return
@@ -745,6 +804,9 @@ func _draw() -> void:
 		while y < vp.y:
 			draw_line(Vector2(0, y), Vector2(vp.x, y), gc, 1.0)
 			y += grid
+	## 連擊邊緣波浪
+	if _wave_level > 0.01:
+		_draw_edge_wave(vp)
 	## 撞牆的光：從撞到的點沿邊緣往兩側跑、漸暗
 	for w in _wall_lights:
 		_draw_wall_light(vp, w)
@@ -812,6 +874,20 @@ func _draw() -> void:
 	## 球的落點在畫面外：邊緣箭頭指向它
 	if sp.x < 0.0 or sp.x > vp.x or sp.y < 0.0 or sp.y > vp.y:
 		_draw_edge_arrow(vp, sp, _ball_col())
+
+	## 連擊軌跡：煙 / 火，畫在球後面
+	for d in _trail:
+		var f: float = d["life"] / d["max"]
+		if d["kind"] == "smoke":
+			draw_circle(d["p"], d["r"], Color(0.97, 0.97, 0.95, 0.4 * f))
+		else:
+			draw_circle(d["p"], d["r"] * (0.5 + 0.5 * f), Color(1.0, 0.45, 0.1, 0.55 * f))
+			draw_circle(d["p"], d["r"] * 0.5 * f, Color(1.0, 0.85, 0.3, 0.9 * f))
+	## 大火：球本身帶光暈
+	if visible_ball and streak >= combo_bigfire_at and state == "air":
+		var pulse: float = 0.85 + 0.15 * sin(_wave_phase * 6.0)
+		draw_circle(sp, ball_r * 1.9 * pulse, Color(1.0, 0.5, 0.15, 0.18))
+		draw_circle(sp, ball_r * 1.4 * pulse, Color(1.0, 0.7, 0.25, 0.25))
 
 	## 球：只有低於 show_height 才看得到，越高(越靠近眼睛)越大
 	if visible_ball:
@@ -1000,14 +1076,42 @@ func _draw_wall_light(vp: Vector2, w: Dictionary) -> void:
 
 
 ## 一段雷射：外層寬而淡（光暈）、內層細而亮（核心）
-func _laser_seg(a: Vector2, b: Vector2, alpha: float, k: float) -> void:
+func _laser_seg(a: Vector2, b: Vector2, alpha: float, k: float, col: Color = WALL_LIGHT_COL) -> void:
 	if a == b:
 		return
-	## 科技感：細而銳利的核心 + 兩圈有明確邊界的光帶（不是柔和漸層），外帶微微偏青
-	draw_line(a, b, Color(0.95, 0.9, 0.7, alpha * 0.14), 48.0 + 12.0 * k)
-	draw_line(a, b, Color(WALL_LIGHT_COL, alpha * 0.4), 22.0 + 8.0 * k)
-	draw_line(a, b, Color(WALL_LIGHT_COL, alpha * 0.75), 9.0)
+	## 科技感：細而銳利的核心 + 兩圈有明確邊界的光帶（不是柔和漸層）
+	draw_line(a, b, Color(col, alpha * 0.14), 48.0 + 12.0 * k)
+	draw_line(a, b, Color(col, alpha * 0.4), 22.0 + 8.0 * k)
+	draw_line(a, b, Color(col, alpha * 0.75), 9.0)
 	draw_line(a, b, Color(1.0, 1.0, 0.96, alpha), 3.0)
+
+
+## 連擊波浪：沿整個外框跑的三道亮波（正弦），白色；30 連擊後變金黃
+func _draw_edge_wave(vp: Vector2) -> void:
+	var P: float = 2.0 * (vp.x + vp.y)
+	var seg := 16.0
+	var inset := 10.0
+	var gold: float = clamp(float(streak - combo_gold_at) / 5.0, 0.0, 1.0) if streak >= combo_gold_at else 0.0
+	var col := Color(1.0, 1.0, 1.0).lerp(Color(1.0, 0.82, 0.25), gold)
+	var s := 0.0
+	while s < P:
+		var s2: float = min(s + seg, P)
+		var mid: float = (s + s2) * 0.5
+		## 三道波繞一圈，往順時針跑
+		var w: float = 0.5 + 0.5 * sin(mid / P * TAU * 3.0 - _wave_phase * TAU)
+		w = w * w * w   ## 讓波峰尖一點、波谷接近全暗
+		var alpha: float = _wave_level * (0.08 + 0.75 * w)
+		var a0: Vector2 = _perimeter_point(s, vp, inset)
+		var a1: Vector2 = _perimeter_point(s2, vp, inset)
+		if a0.x != a1.x and a0.y != a1.y:
+			var on_v0: bool = (a0.x == inset or a0.x == vp.x - inset)
+			var on_h0: bool = (a0.y == inset or a0.y == vp.y - inset)
+			var corner := Vector2(a0.x if on_v0 else a1.x, a0.y if on_h0 else a1.y)
+			_laser_seg(a0, corner, alpha, w, col)
+			_laser_seg(corner, a1, alpha, w, col)
+		else:
+			_laser_seg(a0, a1, alpha, w, col)
+		s = s2
 
 
 ## 判定環：原本的白線加粗，底下墊一圈很淡的暗邊讓紅底也看得清
