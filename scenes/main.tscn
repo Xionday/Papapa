@@ -101,33 +101,6 @@ theme_override_colors/font_color = Color(1, 1, 1, 0.55)
 theme_override_font_sizes/font_size = 22
 text = ""
 
-[node name="Center" type="VBoxContainer" parent="HUD"]
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -300.0
-offset_top = -200.0
-offset_right = 300.0
-offset_bottom = 200.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-alignment = 1
-
-[node name="Score" type="Label" parent="HUD/Center"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 240
-text = "0"
-horizontal_alignment = 1
-
-[node name="Combo" type="Label" parent="HUD/Center"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 32
-text = "BEST 0"
-horizontal_alignment = 1
-
 [node name="Buttons" type="HBoxContainer" parent="HUD"]
 anchors_preset = 3
 anchor_left = 1.0
@@ -215,40 +188,172 @@ size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 22
 text = "test sound"
 
-[node name="Results" type="PanelContainer" parent="HUD"]
-anchors_preset = -1
-anchor_left = 0.06
-anchor_top = 0.5
-anchor_right = 0.94
-anchor_bottom = 0.5
-offset_top = -340.0
-offset_bottom = 340.0
+[node name="Results" type="Control" parent="HUD"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("results_bg")
+
+[node name="Dim" type="ColorRect" parent="HUD/Results"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.08, 0.07, 0.07, 0.55)
 
 [node name="VBox" type="VBoxContainer" parent="HUD/Results"]
-layout_mode = 2
-theme_override_constants/separation = 24
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 48.0
+offset_top = 120.0
+offset_right = -48.0
+offset_bottom = -80.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+alignment = 1
 
-[node name="Text" type="Label" parent="HUD/Results/VBox"]
+[node name="SpacerA" type="Control" parent="HUD/Results/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_font_sizes/font_size = 26
+
+[node name="Reason" type="Label" parent="HUD/Results/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.55)
+theme_override_font_sizes/font_size = 24
+text = "TWO BAD HITS"
+horizontal_alignment = 1
+
+[node name="Count" type="Label" parent="HUD/Results/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.95, 0.85, 1)
+theme_override_font_sizes/font_size = 220
+text = "0"
+horizontal_alignment = 1
+
+[node name="Best" type="Label" parent="HUD/Results/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.87, 0.2, 1)
+theme_override_font_sizes/font_size = 30
+text = "BEST 0"
+horizontal_alignment = 1
+
+[node name="SpacerB" type="Control" parent="HUD/Results/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 36)
+
+[node name="Grades" type="HBoxContainer" parent="HUD/Results/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Perfect" type="VBoxContainer" parent="HUD/Results/VBox/Grades"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="N" type="Label" parent="HUD/Results/VBox/Grades/Perfect"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.36, 0.79, 0.65, 1)
+theme_override_font_sizes/font_size = 64
+text = "0"
+horizontal_alignment = 1
+
+[node name="L" type="Label" parent="HUD/Results/VBox/Grades/Perfect"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.36, 0.79, 0.65, 0.8)
+theme_override_font_sizes/font_size = 20
+text = "PERFECT"
+horizontal_alignment = 1
+
+[node name="Good" type="VBoxContainer" parent="HUD/Results/VBox/Grades"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="N" type="Label" parent="HUD/Results/VBox/Grades/Good"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.53, 0.72, 0.92, 1)
+theme_override_font_sizes/font_size = 64
+text = "0"
+horizontal_alignment = 1
+
+[node name="L" type="Label" parent="HUD/Results/VBox/Grades/Good"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.53, 0.72, 0.92, 0.8)
+theme_override_font_sizes/font_size = 20
+text = "GOOD"
+horizontal_alignment = 1
+
+[node name="Bad" type="VBoxContainer" parent="HUD/Results/VBox/Grades"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="N" type="Label" parent="HUD/Results/VBox/Grades/Bad"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.98, 0.78, 0.46, 1)
+theme_override_font_sizes/font_size = 64
+text = "0"
+horizontal_alignment = 1
+
+[node name="L" type="Label" parent="HUD/Results/VBox/Grades/Bad"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.98, 0.78, 0.46, 0.8)
+theme_override_font_sizes/font_size = 20
+text = "BAD"
+horizontal_alignment = 1
+
+[node name="Miss" type="VBoxContainer" parent="HUD/Results/VBox/Grades"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="N" type="Label" parent="HUD/Results/VBox/Grades/Miss"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.98, 0.6, 0.3, 1)
+theme_override_font_sizes/font_size = 64
+text = "0"
+horizontal_alignment = 1
+
+[node name="L" type="Label" parent="HUD/Results/VBox/Grades/Miss"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.98, 0.6, 0.3, 0.8)
+theme_override_font_sizes/font_size = 20
+text = "MISS"
+horizontal_alignment = 1
+
+[node name="DevStats" type="Label" parent="HUD/Results/VBox"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.5)
+theme_override_font_sizes/font_size = 20
 text = ""
-vertical_alignment = 1
+horizontal_alignment = 1
+
+[node name="SpacerC" type="Control" parent="HUD/Results/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
 
 [node name="PlayAgain" type="Button" parent="HUD/Results/VBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 88)
-theme_override_font_sizes/font_size = 32
-text = "play again"
+custom_minimum_size = Vector2(0, 110)
+theme_override_colors/font_color = Color(0.2, 0.16, 0.1, 1)
+theme_override_colors/font_hover_color = Color(0.2, 0.16, 0.1, 1)
+theme_override_colors/font_pressed_color = Color(0.2, 0.16, 0.1, 1)
+theme_override_font_sizes/font_size = 40
+theme_override_styles/normal = SubResource("btn_primary")
+theme_override_styles/hover = SubResource("btn_primary")
+theme_override_styles/pressed = SubResource("btn_primary")
+text = "PLAY AGAIN"
 
 [node name="Menu" type="Button" parent="HUD/Results/VBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 64)
+custom_minimum_size = Vector2(0, 72)
+theme_override_colors/font_color = Color(1, 1, 1, 0.8)
 theme_override_font_sizes/font_size = 26
-text = "back to menu"
+theme_override_styles/normal = SubResource("btn_ghost")
+theme_override_styles/hover = SubResource("btn_ghost")
+theme_override_styles/pressed = SubResource("btn_ghost")
+text = "menu"
 
 [node name="Menu" type="Control" parent="HUD"]
 anchors_preset = 15
@@ -307,7 +412,7 @@ alignment = 1
 
 [node name="Red" type="Button" parent="HUD/Menu/VBox/Rubber"]
 layout_mode = 2
-custom_minimum_size = Vector2(170, 190)
+custom_minimum_size = Vector2(150, 170)
 flat = true
 
 [node name="Icon" type="Control" parent="HUD/Menu/VBox/Rubber/Red"]
@@ -321,7 +426,7 @@ mode = "red"
 
 [node name="Black" type="Button" parent="HUD/Menu/VBox/Rubber"]
 layout_mode = 2
-custom_minimum_size = Vector2(170, 190)
+custom_minimum_size = Vector2(150, 170)
 flat = true
 
 [node name="Icon" type="Control" parent="HUD/Menu/VBox/Rubber/Black"]
@@ -335,7 +440,7 @@ mode = "black"
 
 [node name="Alt" type="Button" parent="HUD/Menu/VBox/Rubber"]
 layout_mode = 2
-custom_minimum_size = Vector2(170, 190)
+custom_minimum_size = Vector2(150, 170)
 flat = true
 
 [node name="Icon" type="Control" parent="HUD/Menu/VBox/Rubber/Alt"]
@@ -347,9 +452,49 @@ mouse_filter = 2
 script = ExtResource("5_icon")
 mode = "alternate"
 
+[node name="BallLabel" type="Label" parent="HUD/Menu/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.5)
+theme_override_font_sizes/font_size = 22
+text = "BALL"
+horizontal_alignment = 1
+
+[node name="Ball" type="HBoxContainer" parent="HUD/Menu/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 32
+alignment = 1
+
+[node name="Yellow" type="Button" parent="HUD/Menu/VBox/Ball"]
+layout_mode = 2
+custom_minimum_size = Vector2(110, 110)
+flat = true
+
+[node name="Icon" type="Control" parent="HUD/Menu/VBox/Ball/Yellow"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("5_icon")
+mode = "ball_yellow"
+
+[node name="White" type="Button" parent="HUD/Menu/VBox/Ball"]
+layout_mode = 2
+custom_minimum_size = Vector2(110, 110)
+flat = true
+
+[node name="Icon" type="Control" parent="HUD/Menu/VBox/Ball/White"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("5_icon")
+mode = "ball_white"
+
 [node name="Spacer2" type="Control" parent="HUD/Menu/VBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 24)
+custom_minimum_size = Vector2(0, 16)
 
 [node name="Endless" type="Button" parent="HUD/Menu/VBox"]
 layout_mode = 2

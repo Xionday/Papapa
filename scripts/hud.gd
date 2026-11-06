@@ -12,8 +12,7 @@ extends CanvasLayer
 @onready var _sliders_box: VBoxContainer = $Panel/VBox/Sliders
 @onready var _tune_btn: Button = $Buttons/Tune
 @onready var _zero_btn: Button = $Buttons/Zero
-@onready var _results: PanelContainer = $Results
-@onready var _results_text: Label = $Results/VBox/Text
+@onready var _results: Control = $Results
 @onready var _again_btn: Button = $Results/VBox/PlayAgain
 @onready var _menu_btn: Button = $Results/VBox/Menu
 @onready var _menu: Control = $Menu
@@ -24,9 +23,13 @@ var dev_mode: bool = false
 @onready var _rubber_red: Button = $Menu/VBox/Rubber/Red
 @onready var _rubber_black: Button = $Menu/VBox/Rubber/Black
 @onready var _rubber_alt: Button = $Menu/VBox/Rubber/Alt
-@onready var _center: VBoxContainer = $Center
-@onready var _center_score: Label = $Center/Score
-@onready var _center_combo: Label = $Center/Combo
+@onready var _ball_yellow: Button = $Menu/VBox/Ball/Yellow
+@onready var _ball_white: Button = $Menu/VBox/Ball/White
+@onready var _r_reason: Label = $Results/VBox/Reason
+@onready var _r_count: Label = $Results/VBox/Count
+@onready var _r_best: Label = $Results/VBox/Best
+@onready var _r_grades: HBoxContainer = $Results/VBox/Grades
+@onready var _r_dev: Label = $Results/VBox/DevStats
 @onready var _test_haptic: Button = $Panel/VBox/Tests/TestHaptic
 @onready var _show_switch: Button = $Panel/VBox/Tests/ShowSwitch
 @onready var _test_sound: Button = $Panel/VBox/Tests/TestSound
@@ -83,6 +86,12 @@ func _ready() -> void:
 		var m: String = pair[1]
 		b.pressed.connect(func():
 			_game.rubber_mode = m
+			_refresh_rubber_buttons())
+	for pair in [[_ball_yellow, "yellow"], [_ball_white, "white"]]:
+		var b: Button = pair[0]
+		var m: String = pair[1]
+		b.pressed.connect(func():
+			_game.ball_color_mode = m
 			_refresh_rubber_buttons())
 	_refresh_rubber_buttons()
 	_dev_toggle.button_pressed = dev_mode
@@ -157,6 +166,8 @@ func _refresh_rubber_buttons() -> void:
 	for pair in [[_rubber_red, "red"], [_rubber_black, "black"], [_rubber_alt, "alternate"]]:
 		var b: Button = pair[0]
 		b.get_node("Icon").selected = (_game.rubber_mode == pair[1])
+	_ball_yellow.get_node("Icon").selected = _game.ball_color_mode == "yellow"
+	_ball_white.get_node("Icon").selected = _game.ball_color_mode == "white"
 
 
 func _fmt(v: float) -> String:
@@ -171,29 +182,21 @@ func _on_judged(grade: String, dt: float, streak: int, score: int) -> void:
 
 
 func _on_stopped(streak: int, score: int, st: Dictionary) -> void:
-	_judge.text = "STOPPED"
-	_judge.add_theme_color_override("font_color", Color(0.89, 0.29, 0.29))
-	_judge_timer = 1.5
+	_judge.text = ""
 	_last_event = "STOPPED  last %s  peak %.1f" % [_game.last_grade, _game.last_peak]
 	var c: Dictionary = st["counts"]
-	var reason: String = "fell outside the zone" if _game.fell_outside else "two bad hits in a row"
-	_results_text.text = "\n".join([
-		"ROUND OVER - " + reason,
-		"zones reached %d" % (_game.zone_index + 1) if _game.zone_mode else "",
-		"",
-		"score   %d   (best %d)" % [score, _game.best_score],
-		"combo   %d   (best %d)" % [streak, _game.best_streak],
-		"",
-		"perfect %d   good %d   bad %d   miss %d" % [c["perfect"], c["good"], c["bad"], c["miss"]],
-		"",
-		"timing offset (swing - landing), %d hits" % st["hits"],
-		"  - = early, + = late",
-		"  avg %+.0f ms   median %+.0f ms" % [st["dt_avg"] * 1000.0, st["dt_med"] * 1000.0],
-		"  min %+.0f ms   max %+.0f ms" % [st["dt_min"] * 1000.0, st["dt_max"] * 1000.0],
-		"swing peak avg %.1f m/s²" % st["peak_avg"],
-		"",
-		"windows: bias %+.0f ms, perfect <= %.0f ms, good <= %.0f ms" % [_game.timing_bias * 1000.0, _game.perfect_dt * 1000.0, _game.good_dt * 1000.0],
-	])
+	_r_reason.text = "OUT OF THE ZONE" if _game.fell_outside else "TWO BAD HITS"
+	_r_count.text = "%d" % streak
+	var is_best: bool = streak >= _game.best_streak and streak > 0
+	_r_best.text = "NEW BEST" if is_best else "BEST %d" % _game.best_streak
+	_r_grades.get_node("Perfect/N").text = "%d" % c["perfect"]
+	_r_grades.get_node("Good/N").text = "%d" % c["good"]
+	_r_grades.get_node("Bad/N").text = "%d" % c["bad"]
+	_r_grades.get_node("Miss/N").text = "%d" % c["miss"]
+	_r_dev.visible = dev_mode
+	_r_dev.text = "offset avg %+.0f  med %+.0f  min %+.0f  max %+.0f ms   peak %.1f   bias %+.0f  P%.0f  G%.0f" % [
+		st["dt_avg"] * 1000.0, st["dt_med"] * 1000.0, st["dt_min"] * 1000.0, st["dt_max"] * 1000.0,
+		st["peak_avg"], _game.timing_bias * 1000.0, _game.perfect_dt * 1000.0, _game.good_dt * 1000.0]
 	_results.visible = true
 
 
@@ -214,10 +217,7 @@ func _process(delta: float) -> void:
 	$Buttons.visible = dev_mode and not _menu.visible
 	_combo.text = "combo %d   (best %d)" % [_game.streak, _game.best_streak]
 	_score.text = "%d" % _game.score
-	## 正中央：連擊數大字、最佳小字
-	_center.visible = not _menu.visible and not _results.visible
-	_center_score.text = "%d" % _game.streak
-	_center_combo.text = "BEST %d" % _game.best_streak
+	_game.counter_visible = not _menu.visible and not _results.visible
 	_debug.text = "\n".join([
 		"sensor %s  %d Hz  fps %d  haptic %s" % [_sensor.status, _sensor.hz, Engine.get_frames_per_second(), _sensor.haptic_mode],
 		"up accel %+5.1f   horiz %4.1f   h %.2f m   zone %d left %d" % [_game.up_accel, _game.horiz_accel.length(), _game.ball_h, _game.zone_index, _game.zone_left],

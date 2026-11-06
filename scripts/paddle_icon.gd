@@ -18,6 +18,9 @@ const WOOD_DARK := Color(0.55, 0.40, 0.25)
 
 
 func _draw() -> void:
+	if mode.begins_with("ball_"):
+		_draw_ball()
+		return
 	var c := size * 0.5
 	var r: float = min(size.x, size.y) * 0.34
 	var head := c + Vector2(0, -r * 0.25)
@@ -60,3 +63,15 @@ func _draw() -> void:
 			draw_line(head + d, head - d, Color(1, 1, 1, 0.5), 2.0)
 	## 高光
 	draw_circle(head + Vector2(-r * 0.35, -r * 0.35), r * 0.18, Color(1, 1, 1, 0.18))
+
+
+func _draw_ball() -> void:
+	var c := size * 0.5
+	var r: float = min(size.x, size.y) * 0.3
+	var col := Color(1.0, 0.87, 0.2) if mode == "ball_yellow" else Color(0.98, 0.98, 0.95)
+	if selected:
+		draw_circle(c, r + 10.0, Color(1.0, 0.92, 0.7, 0.35))
+		draw_arc(c, r + 7.0, 0.0, TAU, 48, Color(1.0, 0.92, 0.7, 0.9), 3.0)
+	draw_circle(c + Vector2(0, r * 0.08), r, col.darkened(0.25))
+	draw_circle(c, r * 0.96, col)
+	draw_circle(c + Vector2(-r * 0.3, -r * 0.32), r * 0.28, Color(1, 1, 1, 0.55))

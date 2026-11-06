@@ -34,6 +34,12 @@ signal pushed(step: Vector2)
 const RUBBER_RED := Color(0.91, 0.42, 0.40)
 const RUBBER_BLACK := Color(0.16, 0.16, 0.17)
 var rubber_is_red: bool = true
+## 球色：yellow | white
+@export var ball_color_mode: String = "yellow"
+const BALL_YELLOW := Color(1.0, 0.87, 0.2)
+const BALL_WHITE := Color(0.98, 0.98, 0.95)
+var _flip_timer: float = -1.0
+var counter_visible: bool = false               ## alternate 模式：拍到球後 0.5s 換面
 var _rubber_blend: float = 1.0              ## 0 = 黑，1 = 紅，換面時漸變
 @export var clamp_in_zone_mode: bool = false ## 光圈模式不鎖邊界：球釘在世界裡，鏡頭怎麼移都不會被推著走
 @export var good_launch: float = 0.9        ## GOOD 的起跳速度倍率
@@ -327,6 +333,10 @@ func _process(delta: float) -> void:
 	for w in _wall_lights:
 		w["t"] += delta
 	_wall_lights = _wall_lights.filter(func(w): return w["t"] < WALL_LIGHT_T)
+	if _flip_timer >= 0.0:
+		_flip_timer -= delta
+		if _flip_timer < 0.0:
+			rubber_is_red = not rubber_is_red
 	var target_blend: float = 1.0 if rubber_is_red else 0.0
 	_rubber_blend += (target_blend - _rubber_blend) * (1.0 - exp(-10.0 * delta))
 	_step_move(delta)
@@ -463,6 +473,8 @@ func _judge() -> void:
 		_end_round(Color(0.89, 0.29, 0.29))
 		return
 
+	if rubber_mode == "alternate":
+		_flip_timer = 0.5
 	if zone_mode:
 		_zone_hit_flash = 0.3
 		zone_left -= 1
@@ -552,8 +564,6 @@ func _clamp_to_screen() -> void:
 		## 撞點投影到螢幕外框（邊界矩形）上，記成「沿周長的距離」
 		_wall_lights.append({"s": _perimeter_pos(spn, get_viewport_rect().size), "t": 0.0})
 		_sfx.play("wall")
-		if rubber_mode == "alternate":
-			rubber_is_red = not rubber_is_red
 
 
 ## ---- 畫面 ----
@@ -595,6 +605,18 @@ func _draw() -> void:
 	if zone_mode:
 		_draw_zone(vp)
 
+	## 置中計數：畫在球和影子之下、半透明
+	if counter_visible:
+		var font := ThemeDB.fallback_font
+		var c := vp * 0.5
+		var txt := "%d" % streak
+		var fs := 260
+		var w: float = font.get_string_size(txt, HORIZONTAL_ALIGNMENT_CENTER, -1, fs).x
+		draw_string(font, Vector2(c.x - w * 0.5, c.y + fs * 0.35), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 1, 1, 0.45))
+		var bt := "BEST %d" % best_streak
+		var bw: float = font.get_string_size(bt, HORIZONTAL_ALIGNMENT_CENTER, -1, 30).x
+		draw_string(font, Vector2(c.x - bw * 0.5, c.y + fs * 0.35 + 70.0), bt, HORIZONTAL_ALIGNMENT_LEFT, -1, 30, Color(1, 1, 1, 0.35))
+
 	var sp := _to_screen(ball_pos)
 	var max_h: float = max(0.01, (last_launch * last_launch) / (2.0 * gravity_m))
 	var t: float = clamp(ball_h / max_h, 0.0, 1.0)
@@ -602,9 +624,10 @@ func _draw() -> void:
 	## 影子：頭頂燈的模型 — 球越高影子越大越淡，落地時最小最實
 	var shadow_r: float = lerp(28.0, 90.0, t)
 	var shadow_a: float = lerp(0.55, 0.12, t)
-	draw_circle(sp, shadow_r, Color(0, 0, 0, shadow_a))
+	if state != "dead":
+		draw_circle(sp, shadow_r, Color(0, 0, 0, shadow_a))
 
-	var visible_ball: bool = ball_h <= show_height and (state != "dead" or ball_stopped)
+	var visible_ball: bool = ball_h <= show_height and state != "dead"
 	var k: float = clamp(ball_h / show_height, 0.0, 1.0)
 	var ball_r: float = lerp(BALL_R_LAND, BALL_R_HIGH, k)
 
@@ -630,12 +653,18 @@ func _draw() -> void:
 
 	## 球的落點在畫面外：邊緣箭頭指向它
 	if sp.x < 0.0 or sp.x > vp.x or sp.y < 0.0 or sp.y > vp.y:
-		_draw_edge_arrow(vp, sp, Color(0.94, 0.6, 0.48))
+		_draw_edge_arrow(vp, sp, _ball_col())
 
 	## 球：只有低於 show_height 才看得到，越高(越靠近眼睛)越大
 	if visible_ball:
-		draw_circle(sp, ball_r, Color(0.94, 0.6, 0.48))
-		draw_circle(sp + Vector2(-ball_r * 0.3, -ball_r * 0.3), ball_r * 0.25, Color(1, 1, 1, 0.5))
+		var bc := _ball_col()
+		draw_circle(sp + Vector2(0, ball_r * 0.08), ball_r, bc.darkened(0.25))
+		draw_circle(sp, ball_r * 0.96, bc)
+		draw_circle(sp + Vector2(-ball_r * 0.3, -ball_r * 0.32), ball_r * 0.28, Color(1, 1, 1, 0.55))
+
+
+func _ball_col() -> Color:
+	return BALL_WHITE if ball_color_mode == "white" else BALL_YELLOW
 
 
 ## ---- 光圈繪製 ----
@@ -740,7 +769,7 @@ func _draw_wall_light(vp: Vector2, w: Dictionary) -> void:
 	reach = min(reach, P * 0.5)
 	var s0: float = w["s"]
 	var seg := 12.0
-	var inset := 6.0
+	var inset := 10.0
 	## 兩個方向各畫一條 polyline，分段設透明度（越遠越暗）
 	for dir in [1.0, -1.0]:
 		var d := 0.0
@@ -762,18 +791,21 @@ func _draw_wall_light(vp: Vector2, w: Dictionary) -> void:
 			else:
 				_laser_seg(a0, a1, alpha, k)
 			d = d2
-	## 撞點核心：短而亮
-	var hp: Vector2 = _perimeter_point(s0, vp, inset)
-	draw_circle(hp, 14.0 + 30.0 * (t / WALL_LIGHT_T), Color(WALL_LIGHT_COL, fade * 0.35))
-	draw_circle(hp, 8.0 + 10.0 * (t / WALL_LIGHT_T), Color(1.0, 0.98, 0.9, fade))
+	## 前緣：光跑到的最前端有一小段更亮（像掃描頭）
+	for dir in [1.0, -1.0]:
+		var e0: Vector2 = _perimeter_point(s0 + dir * max(reach - 40.0, 0.0), vp, inset)
+		var e1: Vector2 = _perimeter_point(s0 + dir * reach, vp, inset)
+		if e0.x == e1.x or e0.y == e1.y:
+			draw_line(e0, e1, Color(1.0, 1.0, 0.95, fade * 0.9), 3.0)
 
 
 ## 一段雷射：外層寬而淡（光暈）、內層細而亮（核心）
 func _laser_seg(a: Vector2, b: Vector2, alpha: float, k: float) -> void:
 	if a == b:
 		return
-	## 光暈往畫面內側偏，核心貼著邊
-	draw_line(a, b, Color(WALL_LIGHT_COL, alpha * 0.18), 36.0 + 16.0 * k)
-	draw_line(a, b, Color(WALL_LIGHT_COL, alpha * 0.5), 14.0 + 6.0 * k)
-	draw_line(a, b, Color(1.0, 0.98, 0.9, alpha), 4.0)
+	## 科技感：細而銳利的核心 + 兩圈有明確邊界的光帶（不是柔和漸層），外帶微微偏青
+	draw_line(a, b, Color(0.95, 0.9, 0.7, alpha * 0.14), 48.0 + 12.0 * k)
+	draw_line(a, b, Color(WALL_LIGHT_COL, alpha * 0.4), 22.0 + 8.0 * k)
+	draw_line(a, b, Color(WALL_LIGHT_COL, alpha * 0.75), 9.0)
+	draw_line(a, b, Color(1.0, 1.0, 0.96, alpha), 3.0)
 
