@@ -41,6 +41,7 @@ HUD 右下 `tune` 開參數滑桿、`zero` 把目前握持角度設為水平。H
 |---|---|
 | `tests/sim_move.gd` | 位移模型：合成移動曲線比較各參數的位移與飄移（headless） |
 | `tests/sim_game.gd` | 整場景：餵合成感測器資料驗證位移、靜止飄移、光圈命中（headless） |
+| `tests/sim_judge.gd` | 高度判定：在指定高度比例揮擊，驗證 perfect/good/bad/miss 與「最後一次揮擊為準」（headless） |
 | `tests/render_wall.gd` | 離線渲染撞牆雷射光到 `build/*.png`（需 xvfb，不能 headless） |
 
 ## 下一步

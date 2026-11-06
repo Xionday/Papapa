@@ -14,7 +14,11 @@ signal pushed(step: Vector2)
 
 ## ---- 可調參數（HUD 的滑桿會改這些）----
 @export var hit_threshold: float = 1.25     ## m/s²，向上加速度要超過這個才算有揮
-@export var timing_bias: float = -0.05       ## s，perfect 的中心點相對落地的偏移（負 = 允許提早揮）
+## 高度判定：揮擊那一刻球離地高度 / 這次最高點 的比例
+@export var judge_miss_above: float = 0.5   ## 高於這個 → 太早(當 miss，之後再揮以最後一次為準)
+@export var judge_bad_above: float = 0.22   ## 高於這個 → bad
+@export var judge_good_above: float = 0.08  ## 高於這個 → good；更低(含落地後寬限) → perfect
+@export var timing_bias: float = -0.05      ## (舊的時間判定用，保留給 dev 面板參考)       ## s，perfect 的中心點相對落地的偏移（負 = 允許提早揮）
 @export var grace_after: float = 0.08       ## s，落地後再等多久才結算（讓晚一點揮也算得到）
 @export var perfect_dt: float = 0.05        ## s，|揮擊 − 落地| 在這之內 = PERFECT
 @export var good_dt: float = 0.12           ## s，在這之內 = GOOD；再外面 = BAD
@@ -39,7 +43,13 @@ var rubber_is_red: bool = true
 const BALL_YELLOW := Color(1.0, 0.87, 0.2)
 const BALL_WHITE := Color(0.98, 0.98, 0.95)
 var _flip_timer: float = -1.0
-var counter_visible: bool = false               ## alternate 模式：拍到球後 0.5s 換面
+var counter_visible: bool = false
+## 待機球：首頁與結算頁上隨傾斜滾動的裝飾球（螢幕座標）
+var idle_pos: Vector2 = Vector2.ZERO
+var idle_vel: Vector2 = Vector2.ZERO
+var idle_active: bool = false
+@export var idle_gain: float = 900.0        ## px/s² per m/s² 的傾斜
+@export var idle_friction: float = 1.2      ## 1/s               ## alternate 模式：拍到球後 0.5s 換面
 var _rubber_blend: float = 1.0              ## 0 = 黑，1 = 紅，換面時漸變
 @export var clamp_in_zone_mode: bool = false ## 光圈模式不鎖邊界：球釘在世界裡，鏡頭怎麼移都不會被推著走
 @export var good_launch: float = 0.9        ## GOOD 的起跳速度倍率
@@ -121,6 +131,7 @@ var _ring_gold_pos: Vector2 = Vector2.ZERO
 var last_grade: String = ""
 var last_dt: float = 0.0
 var last_peak: float = 0.0
+var last_h_ratio: float = -1.0              ## 最後一次揮擊時球高度/最高點（dev 用）
 var round_log: Array = []                   ## 這局每一次判定 {grade, dt, peak}
 
 ## 感測器
@@ -130,6 +141,8 @@ var horiz_accel: Vector2 = Vector2.ZERO
 var tilt: Vector2 = Vector2.ZERO
 var tilt_zero: Vector2 = Vector2.ZERO        ## 校正：把目前握持角度當成水平
 var _up_hist: Array[Vector2] = []           ## (time, up_accel)，保留最近 1 秒
+var _h_hist: Array[Vector2] = []            ## (time, ball_h)，每幀記，保留最近 1 秒
+var _apex_h: float = 1.0                    ## 這次彈跳的理論最高點(m)
 const HIST_KEEP := 1.0
 
 @onready var _sensor: Node = $SensorBridge
@@ -175,8 +188,11 @@ func to_menu() -> void:
 	_ring_gold = 0.0
 
 
+var _game_time: float = 0.0                 ## 遊戲內時鐘（每幀累加 delta），不用壁鐘：暫停與模擬都正確
+
+
 func _now() -> float:
-	return Time.get_ticks_msec() / 1000.0
+	return _game_time
 
 
 func _on_sample(linear: Vector3, gravity: Vector3) -> void:
@@ -197,6 +213,39 @@ func _on_sample(linear: Vector3, gravity: Vector3) -> void:
 
 func calibrate_tilt() -> void:
 	tilt_zero += tilt
+
+
+## 某個時刻球的高度（從歷史內插）
+func _height_at(t: float) -> float:
+	if _h_hist.is_empty():
+		return 0.0
+	if t <= _h_hist[0].x:
+		return _h_hist[0].y
+	for i in range(1, _h_hist.size()):
+		if _h_hist[i].x >= t:
+			var a := _h_hist[i - 1]
+			var b := _h_hist[i]
+			var u: float = (t - a.x) / max(b.x - a.x, 0.0001)
+			return lerp(a.y, b.y, u)
+	return 0.0
+
+
+## 在 [t0, t1] 之間，找「最後一次」向上加速度超過門檻的揮擊；回傳該次的峰值 (時刻, 值)；沒有 → (−1, 0)
+func _last_swing_between(t0: float, t1: float, threshold: float) -> Vector2:
+	var best := Vector2(-1.0, 0.0)
+	var in_swing := false
+	for sm in _up_hist:
+		if sm.x < t0 or sm.x > t1:
+			continue
+		if sm.y >= threshold:
+			if not in_swing:
+				in_swing = true
+				best = sm
+			elif sm.y > best.y:
+				best = sm
+		else:
+			in_swing = false
+	return best
 
 
 ## 在 [t0, t1] 之間找向上加速度最大的一筆，回傳 (時刻, 值)；沒有就 (−1, 0)
@@ -319,12 +368,14 @@ func _in_zone() -> bool:
 
 ## 起跳瞬間算出理論最高點與落地時刻（收縮環用）
 func _launch_timing() -> void:
+	_apex_h = max(0.01, (v_up * v_up) / (2.0 * gravity_m))
 	var t_half: float = v_up / gravity_m
 	_t_apex = _now() + t_half
 	_t_land_pred = _now() + 2.0 * t_half
 
 
 func _process(delta: float) -> void:
+	_game_time += delta
 	_flash = max(0.0, _flash - delta * 3.0)
 	_ring_gold = max(0.0, _ring_gold - delta)
 	_zone_fade = max(0.0, _zone_fade - delta)
@@ -342,6 +393,7 @@ func _process(delta: float) -> void:
 	_step_move(delta)
 	_step_ash(delta)
 
+	_step_idle(delta)
 	match state:
 		"air":
 			if not debug_freeze:
@@ -353,6 +405,35 @@ func _process(delta: float) -> void:
 		"dead", "menu":
 			pass  ## 等 HUD 的按鈕
 	queue_redraw()
+
+
+## 待機球：首頁/結算頁上，傾斜就滾，撞邊反彈
+func _step_idle(delta: float) -> void:
+	var want: bool = state == "menu" or state == "dead"
+	if want and not idle_active:
+		idle_active = true
+		idle_pos = get_viewport_rect().size * 0.5 + Vector2(0, 120)
+		idle_vel = Vector2.ZERO
+	idle_active = want
+	if not idle_active:
+		return
+	var vp := get_viewport_rect().size
+	idle_vel += tilt * idle_gain * delta
+	idle_vel *= exp(-idle_friction * delta)
+	idle_pos += idle_vel * delta
+	var r := BALL_R_LAND
+	if idle_pos.x < r:
+		idle_pos.x = r
+		idle_vel.x = -idle_vel.x * 0.6
+	elif idle_pos.x > vp.x - r:
+		idle_pos.x = vp.x - r
+		idle_vel.x = -idle_vel.x * 0.6
+	if idle_pos.y < r:
+		idle_pos.y = r
+		idle_vel.y = -idle_vel.y * 0.6
+	elif idle_pos.y > vp.y - r:
+		idle_pos.y = vp.y - r
+		idle_vel.y = -idle_vel.y * 0.6
 
 
 ## 手機位移（衝量版 + 低通 + 遲滯 + ZUPT）
@@ -396,6 +477,10 @@ func _step_move(delta: float) -> void:
 
 
 func _step_air(delta: float) -> void:
+	var now_h := _now()
+	_h_hist.append(Vector2(now_h, ball_h))
+	while _h_hist.size() > 0 and now_h - _h_hist[0].x > HIST_KEEP:
+		_h_hist.pop_front()
 	ball_h += v_up * delta
 	v_up -= gravity_m * delta
 	ball_pos += v_lat * delta
@@ -428,24 +513,29 @@ func _judge() -> void:
 		_end_round(Color(0.89, 0.29, 0.29))
 		return
 
-	var peak := _peak_between(_t_visible, _t_land + grace_after)
+	## 判定視窗：從最高點到落地 + 寬限；取「最後一次」揮擊
+	var peak := _last_swing_between(_t_apex, _t_land + grace_after, hit_threshold)
 	last_peak = peak.y
 	var grade: String
-	if peak.x < 0.0 or peak.y < hit_threshold:
+	last_h_ratio = -1.0
+	if peak.x < 0.0:
 		grade = "miss"
 		last_dt = 0.0
 	else:
-		## 帶正負號：負 = 揮在落地前，正 = 揮在落地後
 		last_dt = peak.x - _t_land
-		var adt: float = abs(last_dt - timing_bias)
-		if adt <= perfect_dt:
-			grade = "perfect"
-		elif adt <= good_dt:
+		## 落地後(寬限內)揮 → 高度視為 0
+		var h: float = 0.0 if peak.x >= _t_land else _height_at(peak.x)
+		last_h_ratio = h / _apex_h
+		if last_h_ratio > judge_miss_above:
+			grade = "miss"
+		elif last_h_ratio > judge_bad_above:
+			grade = "bad"
+		elif last_h_ratio > judge_good_above:
 			grade = "good"
 		else:
-			grade = "bad"
+			grade = "perfect"
 	last_grade = grade
-	round_log.append({"grade": grade, "dt": last_dt, "peak": last_peak})
+	round_log.append({"grade": grade, "dt": last_dt, "peak": last_peak, "h": last_h_ratio})
 
 	match grade:
 		"perfect":
@@ -571,8 +661,8 @@ func _to_screen(world: Vector2) -> Vector2:
 	return get_viewport_rect().size * 0.5 + (world - paddle_pos)
 
 
-const BALL_R_LAND := 26.0
-const BALL_R_HIGH := 70.0
+const BALL_R_LAND := 36.0
+const BALL_R_HIGH := 100.0
 const RING_R_MAX := 150.0
 
 
@@ -583,6 +673,7 @@ func _draw() -> void:
 	if _flash > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, vp), Color(_flash_color, 0.35 * _flash))
 	if state == "menu":
+		_draw_idle_ball()
 		return
 	## 格線：讓推動時看得出世界在動（位移關閉時不畫）
 	var grid := 160.0
@@ -661,6 +752,19 @@ func _draw() -> void:
 		draw_circle(sp + Vector2(0, ball_r * 0.08), ball_r, bc.darkened(0.25))
 		draw_circle(sp, ball_r * 0.96, bc)
 		draw_circle(sp + Vector2(-ball_r * 0.3, -ball_r * 0.32), ball_r * 0.28, Color(1, 1, 1, 0.55))
+	if state == "dead":
+		_draw_idle_ball()
+
+
+func _draw_idle_ball() -> void:
+	if not idle_active:
+		return
+	var r := BALL_R_LAND
+	var bc := _ball_col()
+	draw_circle(idle_pos + Vector2(6, 10), r * 1.05, Color(0, 0, 0, 0.25))
+	draw_circle(idle_pos + Vector2(0, r * 0.08), r, bc.darkened(0.25))
+	draw_circle(idle_pos, r * 0.96, bc)
+	draw_circle(idle_pos + Vector2(-r * 0.3, -r * 0.32), r * 0.28, Color(1, 1, 1, 0.55))
 
 
 func _ball_col() -> Color:

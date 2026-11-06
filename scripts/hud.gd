@@ -41,9 +41,9 @@ const PARAMS := [
 	["zone size x", "zone_scale", 0.5, 2.0, 0.1],
 	["zone distance x", "zone_dist_scale", 0.3, 2.0, 0.1],
 	["hit threshold m/s²", "hit_threshold", 0.5, 10.0, 0.25],
-	["timing bias s", "timing_bias", -0.2, 0.2, 0.01],
-	["perfect window s", "perfect_dt", 0.02, 0.2, 0.01],
-	["good window s", "good_dt", 0.05, 0.4, 0.01],
+	["miss above (h/apex)", "judge_miss_above", 0.2, 0.9, 0.02],
+	["bad above (h/apex)", "judge_bad_above", 0.05, 0.6, 0.01],
+	["good above (h/apex)", "judge_good_above", 0.02, 0.3, 0.01],
 	["grace after land s", "grace_after", 0.0, 0.3, 0.01],
 	["screen width cm", "screen_width_cm", 5.0, 10.0, 0.1],
 	["move px per m", "px_per_m", 1000.0, 16000.0, 250.0],
@@ -178,7 +178,7 @@ func _on_judged(grade: String, dt: float, streak: int, score: int) -> void:
 	_judge.text = grade.to_upper()
 	_judge.add_theme_color_override("font_color", GRADE_COLOR[grade])
 	_judge_timer = 0.7
-	_last_event = "%s  dt %+.0f ms  peak %.1f  launch %.1f" % [grade, dt * 1000.0, _game.last_peak, _game.last_launch]
+	_last_event = "%s  h/apex %.2f  dt %+.0f ms  peak %.1f" % [grade, _game.last_h_ratio, dt * 1000.0, _game.last_peak]
 
 
 func _on_stopped(streak: int, score: int, st: Dictionary) -> void:
@@ -194,9 +194,9 @@ func _on_stopped(streak: int, score: int, st: Dictionary) -> void:
 	_r_grades.get_node("Bad/N").text = "%d" % c["bad"]
 	_r_grades.get_node("Miss/N").text = "%d" % c["miss"]
 	_r_dev.visible = dev_mode
-	_r_dev.text = "offset avg %+.0f  med %+.0f  min %+.0f  max %+.0f ms   peak %.1f   bias %+.0f  P%.0f  G%.0f" % [
+	_r_dev.text = "offset avg %+.0f  med %+.0f  min %+.0f  max %+.0f ms   peak %.1f\nheight thresholds miss>%.2f bad>%.2f good>%.2f" % [
 		st["dt_avg"] * 1000.0, st["dt_med"] * 1000.0, st["dt_min"] * 1000.0, st["dt_max"] * 1000.0,
-		st["peak_avg"], _game.timing_bias * 1000.0, _game.perfect_dt * 1000.0, _game.good_dt * 1000.0]
+		st["peak_avg"], _game.judge_miss_above, _game.judge_bad_above, _game.judge_good_above]
 	_results.visible = true
 
 
