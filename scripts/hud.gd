@@ -45,6 +45,7 @@ const PARAMS := [
 	["perfect gap px", "judge_perfect_gap", 20.0, 300.0, 10.0],
 	["good gap px", "judge_good_gap", 100.0, 500.0, 10.0],
 	["bad gap px", "judge_bad_gap", 200.0, 700.0, 10.0],
+	["max swings per fall", "max_swings", 1.0, 6.0, 1.0],
 	["grace after land s", "grace_after", 0.0, 0.3, 0.01],
 	["screen width cm", "screen_width_cm", 5.0, 10.0, 0.1],
 	["move px per m", "px_per_m", 1000.0, 16000.0, 250.0],
@@ -182,10 +183,10 @@ func _fmt(v: float) -> String:
 
 
 func _on_judged(grade: String, dt: float, streak: int, score: int) -> void:
-	_judge.text = grade.to_upper()
+	_judge.text = "TOO SHAKY" if _game.last_flail else grade.to_upper()
 	_judge.add_theme_color_override("font_color", GRADE_COLOR[grade])
 	_judge_timer = 0.7
-	_last_event = "%s  gap %.0f px  dt %+.0f ms  peak %.1f" % [grade, _game.last_gap, dt * 1000.0, _game.last_peak]
+	_last_event = "%s  gap %.0f px  dt %+.0f ms  peak %.1f  swings %d" % [grade, _game.last_gap, dt * 1000.0, _game.last_peak, _game.last_swings]
 
 
 func _on_stopped(streak: int, score: int, st: Dictionary) -> void:

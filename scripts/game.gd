@@ -15,9 +15,10 @@ signal pushed(step: Vector2)
 ## ---- 可調參數（HUD 的滑桿會改這些）----
 @export var hit_threshold: float = 1.25     ## m/s²，向上加速度要超過這個才算有揮
 ## 判定環判定：揮擊那一刻「環的半徑 − 落地時球半徑」的距離(px)。環等速收縮，所以這等於時間，但跟玩家看到的一致。
-@export var judge_perfect_gap: float = 100.0  ## 環離球 ≤ 這個 → perfect（含落地後寬限）
-@export var judge_good_gap: float = 260.0     ## ≤ 這個 → good
-@export var judge_bad_gap: float = 460.0      ## ≤ 這個 → bad；更遠 → miss(太早；之後再揮以最後一次為準)
+@export var judge_perfect_gap: float = 70.0   ## 環離球 ≤ 這個 → perfect（含落地後寬限）
+@export var judge_good_gap: float = 200.0     ## ≤ 這個 → good
+@export var judge_bad_gap: float = 380.0      ## ≤ 這個 → bad；更遠 → miss(太早；之後再揮以最後一次為準)
+@export var max_swings: int = 2               ## 一次下落裡揮超過這麼多次 = 亂晃，直接 bad
 @export var timing_bias: float = -0.05      ## (舊的時間判定用，保留給 dev 面板參考)       ## s，perfect 的中心點相對落地的偏移（負 = 允許提早揮）
 @export var grace_after: float = 0.08       ## s，落地後再等多久才結算（讓晚一點揮也算得到）
 @export var perfect_dt: float = 0.05        ## s，|揮擊 − 落地| 在這之內 = PERFECT
@@ -133,6 +134,8 @@ var last_dt: float = 0.0
 var last_peak: float = 0.0
 var last_h_ratio: float = -1.0              ## 最後一次揮擊時球高度/最高點（dev 用）
 var last_gap: float = -1.0                  ## 最後一次揮擊時環離球的距離 px（dev 用）
+var last_swings: int = 0                    ## 這次下落揮了幾次
+var last_flail: bool = false                ## 這次是因為亂晃被判 bad
 var round_log: Array = []                   ## 這局每一次判定 {grade, dt, peak}
 
 ## 感測器
@@ -258,6 +261,22 @@ func _last_swing_between(t0: float, t1: float, threshold: float) -> Vector2:
 		else:
 			in_swing = false
 	return best
+
+
+## [t0, t1] 之間有幾次獨立的揮擊（超過門檻的連續段算一次）
+func _count_swings_between(t0: float, t1: float, threshold: float) -> int:
+	var n := 0
+	var in_swing := false
+	for sm in _up_hist:
+		if sm.x < t0 or sm.x > t1:
+			continue
+		if sm.y >= threshold:
+			if not in_swing:
+				in_swing = true
+				n += 1
+		else:
+			in_swing = false
+	return n
 
 
 ## 在 [t0, t1] 之間找向上加速度最大的一筆，回傳 (時刻, 值)；沒有就 (−1, 0)
@@ -532,6 +551,8 @@ func _judge() -> void:
 	var grade: String
 	last_h_ratio = -1.0
 	last_gap = -1.0
+	last_flail = false
+	last_swings = _count_swings_between(_t_apex, _t_land + grace_after, hit_threshold)
 	if peak.x < 0.0:
 		grade = "miss"
 		last_dt = 0.0
@@ -548,6 +569,10 @@ func _judge() -> void:
 			grade = "good"
 		else:
 			grade = "perfect"
+		## 亂晃：一次下落揮太多次，不管時機都算 bad
+		if last_swings > max_swings:
+			grade = "bad"
+			last_flail = true
 	last_grade = grade
 	round_log.append({"grade": grade, "dt": last_dt, "peak": last_peak, "h": last_h_ratio, "gap": last_gap})
 

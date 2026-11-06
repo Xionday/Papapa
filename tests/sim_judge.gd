@@ -103,4 +103,16 @@ func _run() -> void:
 			continue
 		_feed(0.0)
 	print("  早揮(gap550)再揮(gap60) → %s   (應為 perfect, gap %.0f)" % [game.round_log[-1]["grade"], game.last_gap])
+	## 亂晃：整段下落每 6 幀揮一次
+	game.start_game("endless")
+	n0 = game.round_log.size()
+	frames = 0
+	while game.round_log.size() == n0 and frames < 400:
+		frames += 1
+		var falling: bool = game.state == "air" and game._now() >= game._t_apex
+		if falling and frames % 6 < 3:
+			_feed(6.0)
+		else:
+			_feed(0.0)
+	print("  整段亂晃 → %s   (應為 bad, swings %d)" % [game.round_log[-1]["grade"], game.last_swings])
 	quit()
