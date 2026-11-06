@@ -661,14 +661,14 @@ func _to_screen(world: Vector2) -> Vector2:
 	return get_viewport_rect().size * 0.5 + (world - paddle_pos)
 
 
-const BALL_R_LAND := 36.0
-const BALL_R_HIGH := 100.0
+const BALL_R_LAND := 46.0
+const BALL_R_HIGH := 120.0
 const RING_R_MAX := 150.0
 
 
 func _draw() -> void:
 	var vp := get_viewport_rect().size
-	var bg := RUBBER_BLACK.lerp(RUBBER_RED, _rubber_blend) if state != "menu" else Color(0.18, 0.18, 0.17)
+	var bg := RUBBER_BLACK.lerp(RUBBER_RED, _rubber_blend)
 	draw_rect(Rect2(Vector2.ZERO, vp), bg)
 	if _flash > 0.0:
 		draw_rect(Rect2(Vector2.ZERO, vp), Color(_flash_color, 0.35 * _flash))
@@ -728,16 +728,18 @@ func _draw() -> void:
 		var ring_start: float = vp.length() * 0.5 + 20.0
 		var u: float = clamp((now - _t_apex) / max(0.01, _t_land_pred - _t_apex), 0.0, 1.0)
 		var ring_r: float = lerp(ring_start, BALL_R_LAND, u)
-		draw_arc(sp, ring_r, 0.0, TAU, 96, Color(1, 1, 1, 0.3), 3.0)
+		_draw_ring(sp, ring_r, Color(1, 1, 1, 0.85), u)
 	elif state == "settle":
-		draw_arc(sp, BALL_R_LAND, 0.0, TAU, 64, Color(1, 1, 1, 0.3), 3.0)
+		_draw_ring(sp, BALL_R_LAND, Color(1, 1, 1, 0.85), 1.0)
 
 	## PERFECT 的金環殘影與灰燼
 	if _ring_gold > 0.0:
 		var gp := _ring_gold_pos
 		var f: float = _ring_gold / _ring_gold_total
 		## 半徑 = 此刻影子的半徑（球越高影子越大），位置固定在畫面上
-		draw_arc(gp, shadow_r, 0.0, TAU, 64, Color(1.0, 0.84, 0.3, 0.8 * f), 3.0)
+		draw_arc(gp, shadow_r, 0.0, TAU, 64, Color(0, 0, 0, 0.35 * f), 10.0)
+		draw_arc(gp, shadow_r, 0.0, TAU, 64, Color(1.0, 0.84, 0.3, 0.95 * f), 4.0)
+		draw_arc(gp, shadow_r, 0.0, TAU, 64, Color(1.0, 0.97, 0.8, 0.9 * f), 1.5)
 	for d in _ash:
 		var f2: float = d["life"] / d["max"]
 		draw_circle(d["p"], d["r"] * f2, Color(1.0, 0.8, 0.3, 0.9 * f2))
@@ -913,3 +915,15 @@ func _laser_seg(a: Vector2, b: Vector2, alpha: float, k: float) -> void:
 	draw_line(a, b, Color(WALL_LIGHT_COL, alpha * 0.75), 9.0)
 	draw_line(a, b, Color(1.0, 1.0, 0.96, alpha), 3.0)
 
+
+## 判定環：深色暈底 + 亮核心，紅底黑底都看得見；u = 收縮進度(0 遠 1 落地)，越近刻度越明顯
+func _draw_ring(c: Vector2, r: float, col: Color, u: float) -> void:
+	draw_arc(c, r, 0.0, TAU, 96, Color(0, 0, 0, 0.35), 9.0)
+	draw_arc(c, r, 0.0, TAU, 96, col, 3.0)
+	## 四個方向的短刻度，指向中心，讓「快到了」更清楚
+	var tick: float = 10.0 + 10.0 * u
+	for i in 4:
+		var a: float = TAU * i / 4.0
+		var d := Vector2(cos(a), sin(a))
+		draw_line(c + d * (r + 4.0), c + d * (r + 4.0 + tick), Color(0, 0, 0, 0.35), 6.0)
+		draw_line(c + d * (r + 4.0), c + d * (r + 4.0 + tick), col, 2.5)

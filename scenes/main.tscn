@@ -1,10 +1,25 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
 [ext_resource type="Script" path="res://scripts/sensor_bridge.gd" id="2_sensor"]
 [ext_resource type="Script" path="res://scripts/hud.gd" id="3_hud"]
 [ext_resource type="Script" path="res://scripts/sfx.gd" id="4_sfx"]
 [ext_resource type="Script" path="res://scripts/paddle_icon.gd" id="5_icon"]
+[ext_resource type="Shader" path="res://shaders/frosted.gdshader" id="6_frost"]
+
+[sub_resource type="ShaderMaterial" id="frost_menu"]
+shader = ExtResource("6_frost")
+shader_parameter/blur_lod = 3.2
+shader_parameter/tint_strength = 0.3
+shader_parameter/tint = Color(0.12, 0.1, 0.1, 1)
+shader_parameter/frost = 0.1
+
+[sub_resource type="ShaderMaterial" id="frost_results"]
+shader = ExtResource("6_frost")
+shader_parameter/blur_lod = 3.4
+shader_parameter/tint_strength = 0.45
+shader_parameter/tint = Color(0.1, 0.07, 0.07, 1)
+shader_parameter/frost = 0.08
 
 [sub_resource type="StyleBoxFlat" id="btn_primary"]
 content_margin_left = 24.0
@@ -196,11 +211,13 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Dim" type="ColorRect" parent="HUD/Results"]
+material = SubResource("frost_results")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-color = Color(0.08, 0.07, 0.07, 0.55)
+mouse_filter = 2
+color = Color(1, 1, 1, 1)
 
 [node name="VBox" type="VBoxContainer" parent="HUD/Results"]
 layout_mode = 1
@@ -361,6 +378,15 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="Glass" type="ColorRect" parent="HUD/Menu"]
+material = SubResource("frost_menu")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(1, 1, 1, 1)
 
 [node name="VBox" type="VBoxContainer" parent="HUD/Menu"]
 layout_mode = 1

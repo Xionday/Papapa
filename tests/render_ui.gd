@@ -38,8 +38,10 @@ func _process(delta: float) -> bool:
 				_game.start_game("endless")
 				_game.debug_freeze = true
 				_game.state = "air"
-				_game.ball_h = 0.12
+				_game.ball_h = 0.1
 				_game.v_up = -1.0
+				_game._t_apex = _game._now() - 0.45
+				_game._t_land_pred = _game._now() + 0.3
 				_game.ball_pos = Vector2(40.0, 180.0)
 				_game.streak = 23
 				_game.best_streak = 111
